@@ -35,6 +35,7 @@ import play.api.http.HeaderNames
 import play.api.libs.json.JsValue
 import play.api.libs.json.Json
 import play.api.test.Helpers._
+import retry.RetryDetails
 import retry.RetryPolicies
 import retry.RetryPolicy
 import uk.gov.hmrc.ctcguaranteebalancerouter.config.CircuitBreakerConfig
@@ -49,6 +50,8 @@ import uk.gov.hmrc.ctcguaranteebalancerouter.itbase.TestHelpers
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.GuaranteeReferenceNumber
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.errors.RoutingError
 import uk.gov.hmrc.http.HeaderCarrier
+import uk.gov.hmrc.http.HttpResponse
+import uk.gov.hmrc.http.UpstreamErrorResponse
 import uk.gov.hmrc.http.client.HttpClientV2
 import uk.gov.hmrc.http.test.HttpClientV2Support
 
@@ -114,7 +117,8 @@ class EISConnectorSpec
 
   // We construct the connector each time to avoid issues with the circuit breaker
   def noRetriesConnector = new EISConnectorImpl("NoRetry", connectorConfig, TestHelpers.headerCarrierConfig, httpClientV2, NoRetries)
-  def oneRetryConnector  = new EISConnectorImpl("OneRetry", connectorConfig, TestHelpers.headerCarrierConfig, httpClientV2, OneRetry)
+
+  def oneRetryConnector = new EISConnectorImpl("OneRetry", connectorConfig, TestHelpers.headerCarrierConfig, httpClientV2, OneRetry)
 
   lazy val connectorGen: Gen[() => EISConnector] = Gen.oneOf(() => noRetriesConnector, () => oneRetryConnector)
 
@@ -232,19 +236,36 @@ class EISConnectorSpec
             }
         }
     }
+
+    "handle exceptions by returning an HttpResponse with status code 500" in {
+      val httpClientV2 = mock[HttpClientV2]
+
+      val hc        = HeaderCarrier()
+      val connector = new EISConnectorImpl("Failure", connectorConfig, TestHelpers.headerCarrierConfig, httpClientV2, NoRetries)
+
+      when(httpClientV2.post(ArgumentMatchers.any[URL])(ArgumentMatchers.any[HeaderCarrier])).thenReturn(new FakeRequestBuilder)
+
+      whenReady(connector.postAccessCodeRequest(GuaranteeReferenceNumber("abc"), hc).value) {
+        case Left(x) if x.isInstanceOf[RoutingError.Unexpected] => x.asInstanceOf[RoutingError.Unexpected].cause.get mustBe a[RuntimeException]
+        case _                                                  => fail("Left was not a RoutingError.Unexpected")
+      }
+    }
   }
 
-  "handle exceptions by returning an HttpResponse with status code 500" in {
-    val httpClientV2 = mock[HttpClientV2]
+  "retryLogging" should {
 
-    val hc        = HeaderCarrier()
-    val connector = new EISConnectorImpl("Failure", connectorConfig, TestHelpers.headerCarrierConfig, httpClientV2, NoRetries)
+    val testCases: Seq[(String, Either[RoutingError, HttpResponse])] = Seq(
+      "Unexpected Error" -> Left(RoutingError.Unexpected("bleh", None)),
+      "Upstream Error"   -> Left(RoutingError.Upstream(UpstreamErrorResponse("bleh", INTERNAL_SERVER_ERROR))),
+      "Success"          -> Right(mock[HttpResponse])
+    )
 
-    when(httpClientV2.post(ArgumentMatchers.any[URL])(ArgumentMatchers.any[HeaderCarrier])).thenReturn(new FakeRequestBuilder)
-
-    whenReady(connector.postAccessCodeRequest(GuaranteeReferenceNumber("abc"), hc).value) {
-      case Left(x) if x.isInstanceOf[RoutingError.Unexpected] => x.asInstanceOf[RoutingError.Unexpected].cause.get mustBe a[RuntimeException]
-      case _                                                  => fail("Left was not a RoutingError.Unexpected")
+    testCases foreach {
+      entry =>
+        s"always return unit for ${entry._1}" in {
+          noRetriesConnector.retryLogging(entry._2, RetryDetails.GivingUp(1, 20.seconds))
+          succeed // i.e. an exception wasn't thrown
+        }
     }
   }
 

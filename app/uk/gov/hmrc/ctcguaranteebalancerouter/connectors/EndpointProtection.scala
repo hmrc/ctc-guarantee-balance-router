@@ -22,7 +22,8 @@ import play.api.Logging
 import retry.RetryDetails
 import retry.alleycats.instances._
 import retry.retryingOnFailures
-import uk.gov.hmrc.ctcguaranteebalancerouter.config.EISInstanceConfig
+import uk.gov.hmrc.ctcguaranteebalancerouter.config.CircuitBreakerConfig
+import uk.gov.hmrc.ctcguaranteebalancerouter.config.RetryConfig
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
@@ -34,7 +35,9 @@ import scala.util.Try
 trait EndpointProtection { self: Logging =>
   def materializer: Materializer
   def code: String
-  def eisInstanceConfig: EISInstanceConfig
+  def retryConfig: RetryConfig
+
+  def circuitBreakerConfig: CircuitBreakerConfig
   def retries: Retries
 
   private val clazz = getClass.getSimpleName
@@ -43,8 +46,8 @@ trait EndpointProtection { self: Logging =>
     block: => Future[A]
   )(implicit ec: ExecutionContext): Future[A] =
     retryingOnFailures(
-      retries.createRetryPolicy(eisInstanceConfig.retryConfig),
-      (t: A) => Future.successful(!retryWhen(t)),
+      retries.createRetryPolicy(retryConfig),
+      wrapRetryCondition[A](retryWhen),
       (a: A, rd: RetryDetails) => Future.successful(retryLogging.apply(a, rd))
     ) {
       withCircuitBreaker[A](wrapCircuitBreak(circuitBreakWhen)) {
@@ -52,23 +55,26 @@ trait EndpointProtection { self: Logging =>
       }
     }
 
-  private def wrapCircuitBreak[A](strike: A => Boolean)(t: Try[A]): Boolean =
+  def wrapCircuitBreak[A](strike: A => Boolean)(t: Try[A]): Boolean =
     t match {
       case Success(x) => strike(x)
       case Failure(_) => true
     }
+
+  def wrapRetryCondition[A](retryWhen: A => Boolean)(result: A): Future[Boolean] =
+    Future.successful(!retryWhen(result))
 
   def withCircuitBreaker[T](defineFailureFn: Try[T] => Boolean)(block: => Future[T]): Future[T] =
     circuitBreaker.withCircuitBreaker(block, defineFailureFn)
 
   lazy val circuitBreaker = new CircuitBreaker(
     scheduler = materializer.system.scheduler,
-    maxFailures = eisInstanceConfig.circuitBreaker.maxFailures,
-    callTimeout = eisInstanceConfig.circuitBreaker.callTimeout,
-    resetTimeout = eisInstanceConfig.circuitBreaker.resetTimeout,
-    maxResetTimeout = eisInstanceConfig.circuitBreaker.maxResetTimeout,
-    exponentialBackoffFactor = eisInstanceConfig.circuitBreaker.exponentialBackoffFactor,
-    randomFactor = eisInstanceConfig.circuitBreaker.randomFactor
+    maxFailures = circuitBreakerConfig.maxFailures,
+    callTimeout = circuitBreakerConfig.callTimeout,
+    resetTimeout = circuitBreakerConfig.resetTimeout,
+    maxResetTimeout = circuitBreakerConfig.maxResetTimeout,
+    exponentialBackoffFactor = circuitBreakerConfig.exponentialBackoffFactor,
+    randomFactor = circuitBreakerConfig.randomFactor
   )(materializer.executionContext)
     .onOpen(logger.error(s"$code Circuit breaker for $clazz opening due to failures"))
     .onHalfOpen(logger.warn(s"$code Circuit breaker for $clazz resetting after failures"))

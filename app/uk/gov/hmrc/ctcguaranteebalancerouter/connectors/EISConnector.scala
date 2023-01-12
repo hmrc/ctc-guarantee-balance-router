@@ -24,7 +24,9 @@ import play.api.http.MimeTypes
 import play.api.libs.json.JsValue
 import play.api.libs.json.Json
 import retry.RetryDetails
+import uk.gov.hmrc.ctcguaranteebalancerouter.config.CircuitBreakerConfig
 import uk.gov.hmrc.ctcguaranteebalancerouter.config.EISInstanceConfig
+import uk.gov.hmrc.ctcguaranteebalancerouter.config.RetryConfig
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.AccessCodeRequest
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.GuaranteeReferenceNumber
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.errors.RoutingError
@@ -49,7 +51,7 @@ trait EISConnector {
 
 class EISConnectorImpl(
   val code: String,
-  val eisInstanceConfig: EISInstanceConfig,
+  eisInstanceConfig: EISInstanceConfig,
   headerCarrierConfig: HeaderCarrier.Config,
   httpClientV2: HttpClientV2,
   val retries: Retries
@@ -57,6 +59,10 @@ class EISConnectorImpl(
     extends EISConnector
     with EndpointProtection
     with Logging {
+
+  override val retryConfig: RetryConfig = eisInstanceConfig.retryConfig
+
+  override val circuitBreakerConfig: CircuitBreakerConfig = eisInstanceConfig.circuitBreaker
 
   override def postAccessCodeRequest(grn: GuaranteeReferenceNumber, hc: HeaderCarrier)(implicit
     ec: ExecutionContext
@@ -128,5 +134,4 @@ class EISConnectorImpl(
       )
     }
   }
-
 }
