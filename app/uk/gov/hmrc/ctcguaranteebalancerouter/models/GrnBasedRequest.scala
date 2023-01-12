@@ -18,7 +18,7 @@ package uk.gov.hmrc.ctcguaranteebalancerouter.models
 
 import play.api.libs.json.Json
 
-object AccessCodeRequest {
-  implicit val accessCodeRequestFormat = Json.format[AccessCodeRequest]
+object GrnBasedRequest {
+  implicit val accessCodeRequestFormat = Json.format[GrnBasedRequest]
 }
-case class AccessCodeRequest(GRN: GuaranteeReferenceNumber)
+case class GrnBasedRequest(GRN: GuaranteeReferenceNumber)

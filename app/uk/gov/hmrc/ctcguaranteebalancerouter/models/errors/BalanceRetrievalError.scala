@@ -14,10 +14,12 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.ctcguaranteebalancerouter.metrics
+package uk.gov.hmrc.ctcguaranteebalancerouter.models.errors
 
-object MetricsKeys {
+sealed trait BalanceRetrievalError
 
-  val eisAccessCodeEndpoint = "get-eis-access-code"
-  val eisGetBalanceEndpoint = "get-eis-balance"
+object BalanceRetrievalError {
+  case object InvalidJson extends BalanceRetrievalError
+
+  case class Unexpected(message: String, thr: Option[Throwable]) extends BalanceRetrievalError
 }
