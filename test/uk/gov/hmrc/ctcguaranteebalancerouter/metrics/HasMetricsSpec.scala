@@ -30,7 +30,7 @@ import org.scalatest.OptionValues
 import org.scalatest.compatible.Assertion
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AsyncWordSpecLike
-import uk.gov.hmrc.ctcguaranteebalancerouter.models.errors.RoutingError
+import uk.gov.hmrc.ctcguaranteebalancerouter.models.errors.ConnectorError
 
 import scala.concurrent.Future
 
@@ -102,7 +102,7 @@ class HasMetricsSpec extends AsyncWordSpecLike with Matchers with OptionValues w
         metrics =>
           metrics
             .withMetricsTimerResponse(TestMetric)(
-              Future.successful(Left(RoutingError.Unexpected("oops", None)))
+              Future.successful(Left(ConnectorError.Unexpected("oops", None)))
             )
             .map {
               _: Any =>
@@ -129,7 +129,7 @@ class HasMetricsSpec extends AsyncWordSpecLike with Matchers with OptionValues w
       "increment failure counter when the user throws an exception constructing their code block" in withTestMetrics {
         metrics =>
           metrics.withMetricsTimerResponse[Any](TestMetric) {
-            Future.successful(Left(RoutingError.Unexpected("oops", Some(new RuntimeException))))
+            Future.successful(Left(ConnectorError.Unexpected("oops", Some(new RuntimeException))))
           }
 
           Future.successful(verifyCompletedWithFailure(TestMetric, metrics))

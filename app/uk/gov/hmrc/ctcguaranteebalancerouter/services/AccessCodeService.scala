@@ -19,18 +19,13 @@ package uk.gov.hmrc.ctcguaranteebalancerouter.services
 import cats.data.EitherT
 import com.google.inject.ImplementedBy
 import com.google.inject.Inject
-import play.api.libs.json.JsError
-import play.api.libs.json.JsSuccess
-import play.api.libs.json.JsValue
 import uk.gov.hmrc.ctcguaranteebalancerouter.connectors.EISConnectorProvider
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.AccessCode
-import uk.gov.hmrc.ctcguaranteebalancerouter.models.AccessCodeResponse
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.CountryCode
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.GuaranteeReferenceNumber
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.errors.AccessCodeError
-import uk.gov.hmrc.ctcguaranteebalancerouter.models.errors.RoutingError
+import uk.gov.hmrc.ctcguaranteebalancerouter.models.errors.ConnectorError
 import uk.gov.hmrc.http.HeaderCarrier
-import uk.gov.hmrc.http.UpstreamErrorResponse
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
@@ -51,25 +46,20 @@ class AccessCodeServiceImpl @Inject() (connectorProvider: EISConnectorProvider) 
     ec: ExecutionContext
   ): EitherT[Future, AccessCodeError, Unit] =
     for {
-      result          <- connectorProvider(countryCode).postAccessCodeRequest(grn, hc).leftMap(handleRoutingError)
-      validAccessCode <- extractAccessCode(result)
-      _               <- validateCode(accessCode, validAccessCode)
+      result <- connectorProvider(countryCode).postAccessCodeRequest(grn, hc).leftMap(handleRoutingError)
+      _      <- validateCode(accessCode, result.accessCode)
     } yield ()
-
-  private def extractAccessCode(value: JsValue)(implicit ec: ExecutionContext): EitherT[Future, AccessCodeError, AccessCode] =
-    value.validate[AccessCodeResponse] match {
-      case JsSuccess(value, _) => EitherT.rightT(value.accessCode)
-      case JsError(_)          => EitherT.leftT(AccessCodeError.InvalidJson)
-    }
 
   private def validateCode(providedCode: AccessCode, expectedCode: AccessCode)(implicit ec: ExecutionContext): EitherT[Future, AccessCodeError, Unit] =
     if (providedCode == expectedCode) EitherT.rightT(())
     else EitherT.leftT(AccessCodeError.InvalidAccessCode)
 
   // EIS will only return select status codes, so we need to infer from there
-  private def handleRoutingError(error: RoutingError): AccessCodeError = error match {
-    case RoutingError.Upstream(UpstreamErrorResponse(_, statusCode, _, _)) if statusCode <= 499 => AccessCodeError.NotFound
-    case x                                                                                      => AccessCodeError.Routing(x)
+  private def handleRoutingError(error: ConnectorError): AccessCodeError = error match {
+    case ConnectorError.NotFound                   => AccessCodeError.NotFound
+    case ConnectorError.FailedToDeserialise        => AccessCodeError.FailedToDeserialise
+    case ConnectorError.Upstream(error)            => AccessCodeError.Unexpected("Upstream Error", Some(error))
+    case ConnectorError.Unexpected(message, error) => AccessCodeError.Unexpected(message, error)
   }
 
 }

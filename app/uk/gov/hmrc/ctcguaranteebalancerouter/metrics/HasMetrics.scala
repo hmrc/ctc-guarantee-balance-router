@@ -18,7 +18,7 @@ package uk.gov.hmrc.ctcguaranteebalancerouter.metrics
 
 import com.codahale.metrics.MetricRegistry
 import com.kenshoo.play.metrics.Metrics
-import uk.gov.hmrc.ctcguaranteebalancerouter.models.errors.RoutingError
+import uk.gov.hmrc.ctcguaranteebalancerouter.models.errors.ConnectorError
 
 import java.util.concurrent.atomic.AtomicBoolean
 import scala.concurrent.ExecutionContext
@@ -59,7 +59,7 @@ trait HasMetrics {
     */
   def withMetricsTimerResponse[A](
     metricKey: String
-  )(block: => Future[Either[RoutingError, A]])(implicit ec: ExecutionContext): Future[Either[RoutingError, A]] =
+  )(block: => Future[Either[ConnectorError, A]])(implicit ec: ExecutionContext): Future[Either[ConnectorError, A]] =
     withMetricsTimer(metricKey) {
       timer =>
         val response = block

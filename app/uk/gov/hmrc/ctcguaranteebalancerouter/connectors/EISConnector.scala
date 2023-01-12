@@ -22,7 +22,10 @@ import com.kenshoo.play.metrics.Metrics
 import play.api.Logging
 import play.api.http.HeaderNames
 import play.api.http.MimeTypes
-import play.api.libs.json.JsValue
+import play.api.http.Status.BAD_REQUEST
+import play.api.http.Status.NOT_FOUND
+import play.api.libs.json.JsError
+import play.api.libs.json.JsSuccess
 import play.api.libs.json.Json
 import retry.RetryDetails
 import uk.gov.hmrc.ctcguaranteebalancerouter.config.CircuitBreakerConfig
@@ -31,8 +34,9 @@ import uk.gov.hmrc.ctcguaranteebalancerouter.config.RetryConfig
 import uk.gov.hmrc.ctcguaranteebalancerouter.metrics.HasMetrics
 import uk.gov.hmrc.ctcguaranteebalancerouter.metrics.MetricsKeys
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.AccessCodeRequest
+import uk.gov.hmrc.ctcguaranteebalancerouter.models.AccessCodeResponse
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.GuaranteeReferenceNumber
-import uk.gov.hmrc.ctcguaranteebalancerouter.models.errors.RoutingError
+import uk.gov.hmrc.ctcguaranteebalancerouter.models.errors.ConnectorError
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.http.HttpReads.Implicits._
 import uk.gov.hmrc.http.HttpResponse
@@ -48,7 +52,9 @@ import scala.util.control.NonFatal
 
 trait EISConnector {
 
-  def postAccessCodeRequest(grn: GuaranteeReferenceNumber, hc: HeaderCarrier)(implicit ec: ExecutionContext): EitherT[Future, RoutingError, JsValue]
+  def postAccessCodeRequest(grn: GuaranteeReferenceNumber, hc: HeaderCarrier)(implicit
+    ec: ExecutionContext
+  ): EitherT[Future, ConnectorError, AccessCodeResponse]
 
 }
 
@@ -71,10 +77,10 @@ class EISConnectorImpl(
 
   override def postAccessCodeRequest(grn: GuaranteeReferenceNumber, hc: HeaderCarrier)(implicit
     ec: ExecutionContext
-  ): EitherT[Future, RoutingError, JsValue] = {
+  ): EitherT[Future, ConnectorError, AccessCodeResponse] = {
     val request = Json.toJson(AccessCodeRequest(grn))
     EitherT {
-      protect(isFailure, isFailure, retryLogging) {
+      protect(isFailure[AccessCodeResponse], isFailure[AccessCodeResponse], retryLogging) {
         val correlationId = UUID.randomUUID().toString;
         val requestHeaders = hc.headers(Seq(HMRCHeaderNames.xRequestId)) ++ Seq(
           "X-Correlation-Id"        -> correlationId,
@@ -93,32 +99,38 @@ class EISConnectorImpl(
             .withBody(request)
             .setHeader(headerCarrier.headersForUrl(headerCarrierConfig)(eisInstanceConfig.accessCodeUrl): _*)
             .execute[Either[UpstreamErrorResponse, HttpResponse]]
-            .map {
-              case Right(httpResponse)         => Right(httpResponse.json)
-              case Left(upstreamErrorResponse) => Left(RoutingError.Upstream(upstreamErrorResponse))
+            .map[Either[ConnectorError, AccessCodeResponse]] {
+              case Right(httpResponse) =>
+                httpResponse.json.validate[AccessCodeResponse] match {
+                  case JsSuccess(value, _) => Right(value)
+                  case JsError(_)          => Left(ConnectorError.FailedToDeserialise)
+                }
+              // TODO: Improve once we know what EIS will do
+              case Left(UpstreamErrorResponse(_, statusCode, _, _)) if statusCode == BAD_REQUEST || statusCode == NOT_FOUND => Left(ConnectorError.NotFound)
+              case Left(upstreamErrorResponse)                                                                              => Left(ConnectorError.Upstream(upstreamErrorResponse))
             }
             .recover {
               case NonFatal(e) =>
                 logger.error(s"Request Error: Routing to $code failed to retrieve data with message ${e.getMessage}. Correlation ID: $correlationId.")
-                Left[RoutingError, JsValue](RoutingError.Unexpected("message", Some(e)))
+                Left(ConnectorError.Unexpected("message", Some(e)))
             }
         }
       }
     }
   }
 
-  private val isFailure: PartialFunction[Either[RoutingError, JsValue], Boolean] = {
-    case Right(_)                                                                                     => false
-    case Left(RoutingError.Upstream(UpstreamErrorResponse(_, statusCode, _, _))) if statusCode <= 499 => false
-    case _                                                                                            => true
+  private def isFailure[A](either: Either[ConnectorError, A]): Boolean = either match {
+    case Right(_)                                                                                       => false
+    case Left(ConnectorError.Upstream(UpstreamErrorResponse(_, statusCode, _, _))) if statusCode <= 499 => false
+    case _                                                                                              => true
   }
 
-  def retryLogging(response: Either[RoutingError, _], retryDetails: RetryDetails): Unit =
+  def retryLogging(response: Either[ConnectorError, _], retryDetails: RetryDetails): Unit =
     response match {
-      case Left(RoutingError.Upstream(upstreamErrorResponse)) =>
+      case Left(ConnectorError.Upstream(upstreamErrorResponse)) =>
         logAttemptedRetry(s"with status code ${upstreamErrorResponse.statusCode}", retryDetails)
-      case Left(RoutingError.Unexpected(message, _)) => logAttemptedRetry(s"with error $message", retryDetails)
-      case _                                         => ()
+      case Left(ConnectorError.Unexpected(message, _)) => logAttemptedRetry(s"with error $message", retryDetails)
+      case _                                           => ()
     }
 
   private def logAttemptedRetry(message: String, retryDetails: RetryDetails): Unit = {

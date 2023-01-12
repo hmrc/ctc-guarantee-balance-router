@@ -18,9 +18,11 @@ package uk.gov.hmrc.ctcguaranteebalancerouter.models.errors
 
 import uk.gov.hmrc.http.UpstreamErrorResponse
 
-object RoutingError {
-  case class Upstream(upstreamErrorResponse: UpstreamErrorResponse) extends RoutingError
-  case class Unexpected(message: String, cause: Option[Throwable])  extends RoutingError
-}
+sealed trait ConnectorError
 
-sealed trait RoutingError
+object ConnectorError {
+  case object NotFound                                              extends ConnectorError
+  case object FailedToDeserialise                                   extends ConnectorError
+  case class Upstream(upstreamErrorResponse: UpstreamErrorResponse) extends ConnectorError
+  case class Unexpected(message: String, cause: Option[Throwable])  extends ConnectorError
+}

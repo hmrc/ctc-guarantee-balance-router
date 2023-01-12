@@ -16,11 +16,11 @@
 
 package uk.gov.hmrc.ctcguaranteebalancerouter.models.errors
 
-trait AccessCodeError
+sealed trait AccessCodeError
 
 object AccessCodeError {
-  case object InvalidAccessCode                  extends AccessCodeError
-  case object InvalidJson                        extends AccessCodeError
-  case object NotFound                           extends AccessCodeError
-  case class Routing(routingError: RoutingError) extends AccessCodeError
+  case object InvalidAccessCode                                  extends AccessCodeError
+  case object FailedToDeserialise                                extends AccessCodeError
+  case object NotFound                                           extends AccessCodeError
+  case class Unexpected(message: String, thr: Option[Throwable]) extends AccessCodeError
 }

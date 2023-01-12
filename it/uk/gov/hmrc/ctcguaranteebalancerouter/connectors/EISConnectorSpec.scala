@@ -32,7 +32,6 @@ import org.scalatest.time.SpanSugar.convertIntToGrainOfTime
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 import play.api.http.HeaderNames
-import play.api.libs.json.JsValue
 import play.api.libs.json.Json
 import play.api.test.Helpers._
 import retry.RetryDetails
@@ -48,8 +47,10 @@ import uk.gov.hmrc.ctcguaranteebalancerouter.itbase.RegexPatterns
 import uk.gov.hmrc.ctcguaranteebalancerouter.itbase.TestActorSystem
 import uk.gov.hmrc.ctcguaranteebalancerouter.itbase.TestHelpers
 import uk.gov.hmrc.ctcguaranteebalancerouter.itbase.TestMetrics
+import uk.gov.hmrc.ctcguaranteebalancerouter.models.AccessCode
+import uk.gov.hmrc.ctcguaranteebalancerouter.models.AccessCodeResponse
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.GuaranteeReferenceNumber
-import uk.gov.hmrc.ctcguaranteebalancerouter.models.errors.RoutingError
+import uk.gov.hmrc.ctcguaranteebalancerouter.models.errors.ConnectorError
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.http.HttpResponse
 import uk.gov.hmrc.http.UpstreamErrorResponse
@@ -169,8 +170,9 @@ class EISConnectorSpec
         val hc = HeaderCarrier()
 
         whenReady(connector().postAccessCodeRequest(grn, hc).value) {
-          case Right(_: JsValue) => succeed
-          case Left(ex)          => fail(s"Failed with ${ex.toString}")
+          case Right(AccessCodeResponse(grn, AccessCode("ABCD"))) => succeed
+          case Right(x)                                           => fail(s"Got $x, which was not expected")
+          case Left(ex)                                           => fail(s"Failed with ${ex.toString}")
         }
     }
 
@@ -201,14 +203,37 @@ class EISConnectorSpec
       val hc = HeaderCarrier()
 
       whenReady(oneRetryConnector.postAccessCodeRequest(GuaranteeReferenceNumber("abc"), hc).value) {
-        case Right(_: JsValue) => succeed
-        case Left(ex)          => fail(s"Failed with ${ex.toString}")
+        case Right(AccessCodeResponse(GuaranteeReferenceNumber("abc"), AccessCode("ABCD"))) => succeed
+        case Right(x) =>
+          fail(s"Got $x, which was not expected")
+        case Left(ex) =>
+          fail(s"Failed with ${ex.toString}")
       }
     }
 
+    // We're making a guess that EIS won't return a 404, but a 400 due to zero trust.
+    "a 400 error becomes not found" in forAll(connectorGen) {
+      connector =>
+        server.resetAll() // Need to reset due to the forAll - it's technically the same test
+
+        server.stubFor(
+          post(
+            urlEqualTo(accessCodeUri)
+          ).withHeader("Authorization", equalTo("Bearer bearertokenhereGB"))
+            .withHeader(HeaderNames.ACCEPT, equalTo("application/json"))
+            .withHeader("X-Correlation-Id", matching(RegexPatterns.UUID))
+            .willReturn(aResponse().withStatus(BAD_REQUEST))
+        )
+
+        val hc = HeaderCarrier()
+
+        whenReady(connector().postAccessCodeRequest(GuaranteeReferenceNumber("abc"), hc).value) {
+          case Left(ConnectorError.NotFound) => succeed
+          case x                             => fail(s"Left was not a RoutingError.NotFound (got $x)")
+        }
+    }
+
     Seq(
-      BAD_REQUEST,
-      FORBIDDEN,
       INTERNAL_SERVER_ERROR,
       BAD_GATEWAY,
       GATEWAY_TIMEOUT
@@ -230,7 +255,7 @@ class EISConnectorSpec
             val hc = HeaderCarrier()
 
             whenReady(connector().postAccessCodeRequest(GuaranteeReferenceNumber("abc"), hc).value) {
-              case Left(x: RoutingError.Upstream) =>
+              case Left(x: ConnectorError.Upstream) =>
                 x.upstreamErrorResponse.statusCode mustBe statusCode
               case x =>
                 fail(s"Left was not a RoutingError.Upstream (got $x)")
@@ -247,17 +272,17 @@ class EISConnectorSpec
       when(httpClientV2.post(ArgumentMatchers.any[URL])(ArgumentMatchers.any[HeaderCarrier])).thenReturn(new FakeRequestBuilder)
 
       whenReady(connector.postAccessCodeRequest(GuaranteeReferenceNumber("abc"), hc).value) {
-        case Left(x) if x.isInstanceOf[RoutingError.Unexpected] => x.asInstanceOf[RoutingError.Unexpected].cause.get mustBe a[RuntimeException]
-        case _                                                  => fail("Left was not a RoutingError.Unexpected")
+        case Left(x) if x.isInstanceOf[ConnectorError.Unexpected] => x.asInstanceOf[ConnectorError.Unexpected].cause.get mustBe a[RuntimeException]
+        case _                                                    => fail("Left was not a RoutingError.Unexpected")
       }
     }
   }
 
   "retryLogging" should {
 
-    val testCases: Seq[(String, Either[RoutingError, HttpResponse])] = Seq(
-      "Unexpected Error" -> Left(RoutingError.Unexpected("bleh", None)),
-      "Upstream Error"   -> Left(RoutingError.Upstream(UpstreamErrorResponse("bleh", INTERNAL_SERVER_ERROR))),
+    val testCases: Seq[(String, Either[ConnectorError, HttpResponse])] = Seq(
+      "Unexpected Error" -> Left(ConnectorError.Unexpected("bleh", None)),
+      "Upstream Error"   -> Left(ConnectorError.Upstream(UpstreamErrorResponse("bleh", INTERNAL_SERVER_ERROR))),
       "Success"          -> Right(mock[HttpResponse])
     )
 
