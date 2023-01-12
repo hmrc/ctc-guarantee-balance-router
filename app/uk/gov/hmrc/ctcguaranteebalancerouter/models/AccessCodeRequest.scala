@@ -21,4 +21,4 @@ import play.api.libs.json.Json
 object AccessCodeRequest {
   implicit val accessCodeRequestFormat = Json.format[AccessCodeRequest]
 }
-case class AccessCodeRequest(grn: GuaranteeReferenceNumber)
+case class AccessCodeRequest(GRN: GuaranteeReferenceNumber)

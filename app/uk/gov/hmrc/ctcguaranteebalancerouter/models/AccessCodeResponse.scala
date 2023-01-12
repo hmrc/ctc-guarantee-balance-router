@@ -22,4 +22,4 @@ object AccessCodeResponse {
   implicit val accessCodeResponseFormat = Json.format[AccessCodeResponse]
 }
 
-case class AccessCodeResponse(grn: GuaranteeReferenceNumber, accessCode: AccessCode)
+case class AccessCodeResponse(GRN: GuaranteeReferenceNumber, accessCode: AccessCode)

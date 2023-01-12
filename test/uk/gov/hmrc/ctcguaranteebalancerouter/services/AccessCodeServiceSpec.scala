@@ -24,6 +24,7 @@ import org.scalacheck.Gen
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.must.Matchers
+import org.scalatest.time.SpanSugar.convertIntToGrainOfTime
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 import play.api.http.Status.BAD_REQUEST
 import play.api.http.Status.INTERNAL_SERVER_ERROR
@@ -46,6 +47,8 @@ class AccessCodeServiceSpec extends AnyFreeSpec with Matchers with ScalaCheckDri
 
   "AccessCodeService#ensureAccessCodeValid" - {
 
+    import org.scalatest.concurrent.PatienceConfiguration.Timeout
+
     implicit val hc: HeaderCarrier = HeaderCarrier()
 
     "on valid access code, return a Right of Unit" in forAll(
@@ -56,11 +59,11 @@ class AccessCodeServiceSpec extends AnyFreeSpec with Matchers with ScalaCheckDri
       (grn, accessCode, countryCode) =>
         val mockConnector = mock[EISConnector]
         when(mockConnector.postAccessCodeRequest(GuaranteeReferenceNumber(any()), any())(any()))
-          .thenReturn(EitherT.rightT(Json.obj("grn" -> grn.value, "accessCode" -> accessCode.value)))
+          .thenReturn(EitherT.rightT(Json.obj("GRN" -> grn.value, "accessCode" -> accessCode.value)))
 
         val sut = new AccessCodeServiceImpl(FakeEISConnectorProvider(mockConnector, mockConnector))
 
-        whenReady(sut.ensureAccessCodeValid(grn, accessCode, countryCode).value) {
+        whenReady(sut.ensureAccessCodeValid(grn, accessCode, countryCode).value, Timeout(1.second)) {
           _ mustBe Right(())
         }
     }
@@ -73,11 +76,11 @@ class AccessCodeServiceSpec extends AnyFreeSpec with Matchers with ScalaCheckDri
       (grn, accessCode, countryCode) =>
         val mockConnector = mock[EISConnector]
         when(mockConnector.postAccessCodeRequest(GuaranteeReferenceNumber(any()), any())(any()))
-          .thenReturn(EitherT.rightT(Json.obj("grn" -> grn.value, "accessCode" -> "AABCD"))) // we know this is invalid
+          .thenReturn(EitherT.rightT(Json.obj("GRN" -> grn.value, "accessCode" -> "AABCD"))) // we know this is invalid
 
         val sut = new AccessCodeServiceImpl(FakeEISConnectorProvider(mockConnector, mockConnector))
 
-        whenReady(sut.ensureAccessCodeValid(grn, accessCode, countryCode).value) {
+        whenReady(sut.ensureAccessCodeValid(grn, accessCode, countryCode).value, Timeout(1.second)) {
           _ mustBe Left(AccessCodeError.InvalidAccessCode)
         }
     }
@@ -94,7 +97,7 @@ class AccessCodeServiceSpec extends AnyFreeSpec with Matchers with ScalaCheckDri
 
         val sut = new AccessCodeServiceImpl(FakeEISConnectorProvider(mockConnector, mockConnector))
 
-        whenReady(sut.ensureAccessCodeValid(grn, accessCode, countryCode).value) {
+        whenReady(sut.ensureAccessCodeValid(grn, accessCode, countryCode).value, Timeout(1.second)) {
           _ mustBe Left(AccessCodeError.InvalidJson)
         }
     }
@@ -115,7 +118,7 @@ class AccessCodeServiceSpec extends AnyFreeSpec with Matchers with ScalaCheckDri
 
         val sut = new AccessCodeServiceImpl(FakeEISConnectorProvider(mockConnector, mockConnector))
 
-        whenReady(sut.ensureAccessCodeValid(grn, accessCode, countryCode).value) {
+        whenReady(sut.ensureAccessCodeValid(grn, accessCode, countryCode).value, Timeout(1.second)) {
           _ mustBe Left(AccessCodeError.NotFound)
         }
     }
@@ -132,7 +135,7 @@ class AccessCodeServiceSpec extends AnyFreeSpec with Matchers with ScalaCheckDri
 
         val sut = new AccessCodeServiceImpl(FakeEISConnectorProvider(mockConnector, mockConnector))
 
-        whenReady(sut.ensureAccessCodeValid(grn, accessCode, countryCode).value) {
+        whenReady(sut.ensureAccessCodeValid(grn, accessCode, countryCode).value, Timeout(1.second)) {
           _ mustBe Left(AccessCodeError.Routing(error))
         }
     }
