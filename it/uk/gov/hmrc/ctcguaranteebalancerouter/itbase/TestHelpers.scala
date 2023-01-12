@@ -14,19 +14,14 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.ctcguaranteebalancerouter.config
+package uk.gov.hmrc.ctcguaranteebalancerouter.itbase
 
-import javax.inject.Inject
-import javax.inject.Singleton
-import play.api.Configuration
+import play.api.inject.guice.GuiceApplicationBuilder
 import uk.gov.hmrc.http.HeaderCarrier
 
-@Singleton
-class AppConfig @Inject() (config: Configuration) {
+object TestHelpers {
 
-  lazy val appName: String                           = config.get[String]("appName")
-  lazy val headerCarrierConfig: HeaderCarrier.Config = HeaderCarrier.Config.fromConfig(config.underlying)
+  lazy val headerCarrierConfig: HeaderCarrier.Config =
+    HeaderCarrier.Config.fromConfig(GuiceApplicationBuilder().build().configuration.underlying)
 
-  lazy val eisGbConfig: EISInstanceConfig = config.get[EISInstanceConfig]("microservice.services.eis.gb")
-  lazy val eisXiConfig: EISInstanceConfig = config.get[EISInstanceConfig]("microservice.services.eis.xi")
 }

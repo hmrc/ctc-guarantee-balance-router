@@ -14,12 +14,10 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.ctcguaranteebalancerouter.models
+package uk.gov.hmrc.ctcguaranteebalancerouter.itbase
 
-import play.api.libs.json.Json
+object RegexPatterns {
 
-object GuaranteeReferenceNumber {
-  implicit val guaranteeReferenceNumberFormat = Json.valueFormat[GuaranteeReferenceNumber]
+  val UUID: String = raw"\b[0-9a-f]{8}\b-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-\b[0-9a-f]{12}\b"
+
 }
-
-case class GuaranteeReferenceNumber(value: String) extends AnyVal

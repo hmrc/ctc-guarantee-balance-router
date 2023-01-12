@@ -14,12 +14,6 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.ctcguaranteebalancerouter.models
+package uk.gov.hmrc.ctcguaranteebalancerouter.connectors
 
-import play.api.libs.json.Json
-
-object GuaranteeReferenceNumber {
-  implicit val guaranteeReferenceNumberFormat = Json.valueFormat[GuaranteeReferenceNumber]
-}
-
-case class GuaranteeReferenceNumber(value: String) extends AnyVal
+class EndpointProtectionSpec {}

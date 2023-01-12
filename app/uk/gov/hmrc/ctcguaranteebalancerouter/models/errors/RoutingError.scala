@@ -14,12 +14,13 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.ctcguaranteebalancerouter.models
+package uk.gov.hmrc.ctcguaranteebalancerouter.models.errors
 
-import play.api.libs.json.Json
+import uk.gov.hmrc.http.UpstreamErrorResponse
 
-object GuaranteeReferenceNumber {
-  implicit val guaranteeReferenceNumberFormat = Json.valueFormat[GuaranteeReferenceNumber]
+object RoutingError {
+  case class Upstream(upstreamErrorResponse: UpstreamErrorResponse) extends RoutingError
+  case class Unexpected(message: String, cause: Option[Throwable])  extends RoutingError
 }
 
-case class GuaranteeReferenceNumber(value: String) extends AnyVal
+sealed trait RoutingError
