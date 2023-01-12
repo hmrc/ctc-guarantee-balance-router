@@ -88,8 +88,8 @@ class EISConnectorImpl(
           .setHeader(headerCarrier.headersForUrl(headerCarrierConfig)(eisInstanceConfig.accessCodeUrl): _*)
           .execute[Either[UpstreamErrorResponse, HttpResponse]]
           .map {
-            case Right(x) => Right(x.json)
-            case Left(x)  => Left(RoutingError.Upstream(x))
+            case Right(httpResponse)         => Right(httpResponse.json)
+            case Left(upstreamErrorResponse) => Left(RoutingError.Upstream(upstreamErrorResponse))
           }
           .recover {
             case NonFatal(e) =>

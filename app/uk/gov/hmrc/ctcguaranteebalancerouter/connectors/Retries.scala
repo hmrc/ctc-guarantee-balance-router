@@ -58,9 +58,8 @@ class RetriesImpl extends Retries {
 
     def decideNextRetry(status: RetryStatus): M[PolicyDecision] =
       policy.decideNextRetry(status).map {
-        case r @ DelayAndRetry(delay) =>
-          if (System.currentTimeMillis() + delay.toMillis > endTime) GiveUp else r
-        case GiveUp => GiveUp
+        case r @ DelayAndRetry(delay) if System.currentTimeMillis() + delay.toMillis <= endTime => r
+        case _: DelayAndRetry | GiveUp                                                          => GiveUp
       }
 
     RetryPolicy.withShow[M](
