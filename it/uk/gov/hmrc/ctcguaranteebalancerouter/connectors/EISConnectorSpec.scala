@@ -47,6 +47,7 @@ import uk.gov.hmrc.ctcguaranteebalancerouter.itbase.Generators
 import uk.gov.hmrc.ctcguaranteebalancerouter.itbase.RegexPatterns
 import uk.gov.hmrc.ctcguaranteebalancerouter.itbase.TestActorSystem
 import uk.gov.hmrc.ctcguaranteebalancerouter.itbase.TestHelpers
+import uk.gov.hmrc.ctcguaranteebalancerouter.itbase.TestMetrics
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.GuaranteeReferenceNumber
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.errors.RoutingError
 import uk.gov.hmrc.http.HeaderCarrier
@@ -116,9 +117,9 @@ class EISConnectorSpec
   )
 
   // We construct the connector each time to avoid issues with the circuit breaker
-  def noRetriesConnector = new EISConnectorImpl("NoRetry", connectorConfig, TestHelpers.headerCarrierConfig, httpClientV2, NoRetries)
+  def noRetriesConnector = new EISConnectorImpl("NoRetry", connectorConfig, TestHelpers.headerCarrierConfig, httpClientV2, NoRetries, new TestMetrics)
 
-  def oneRetryConnector = new EISConnectorImpl("OneRetry", connectorConfig, TestHelpers.headerCarrierConfig, httpClientV2, OneRetry)
+  def oneRetryConnector = new EISConnectorImpl("OneRetry", connectorConfig, TestHelpers.headerCarrierConfig, httpClientV2, OneRetry, new TestMetrics)
 
   lazy val connectorGen: Gen[() => EISConnector] = Gen.oneOf(() => noRetriesConnector, () => oneRetryConnector)
 
@@ -241,7 +242,7 @@ class EISConnectorSpec
       val httpClientV2 = mock[HttpClientV2]
 
       val hc        = HeaderCarrier()
-      val connector = new EISConnectorImpl("Failure", connectorConfig, TestHelpers.headerCarrierConfig, httpClientV2, NoRetries)
+      val connector = new EISConnectorImpl("Failure", connectorConfig, TestHelpers.headerCarrierConfig, httpClientV2, NoRetries, new TestMetrics)
 
       when(httpClientV2.post(ArgumentMatchers.any[URL])(ArgumentMatchers.any[HeaderCarrier])).thenReturn(new FakeRequestBuilder)
 

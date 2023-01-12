@@ -19,6 +19,7 @@ package uk.gov.hmrc.ctcguaranteebalancerouter.connectors
 import akka.stream.Materializer
 import com.google.inject.ImplementedBy
 import com.google.inject.Inject
+import com.kenshoo.play.metrics.Metrics
 import uk.gov.hmrc.ctcguaranteebalancerouter.config.AppConfig
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.CountryCode
 import uk.gov.hmrc.http.client.HttpClientV2
@@ -35,8 +36,9 @@ trait EISConnectorProvider {
   }
 }
 
-class EISConnectorProviderImpl @Inject() (appConfig: AppConfig, httpClientV2: HttpClientV2, retries: Retries)(implicit materializer: Materializer)
-    extends EISConnectorProvider {
-  protected lazy val gb: EISConnector = new EISConnectorImpl("GB", appConfig.eisGbConfig, appConfig.headerCarrierConfig, httpClientV2, retries)
-  protected lazy val xi: EISConnector = new EISConnectorImpl("XI", appConfig.eisXiConfig, appConfig.headerCarrierConfig, httpClientV2, retries)
+class EISConnectorProviderImpl @Inject() (appConfig: AppConfig, httpClientV2: HttpClientV2, retries: Retries, metrics: Metrics)(implicit
+  materializer: Materializer
+) extends EISConnectorProvider {
+  protected lazy val gb: EISConnector = new EISConnectorImpl("GB", appConfig.eisGbConfig, appConfig.headerCarrierConfig, httpClientV2, retries, metrics)
+  protected lazy val xi: EISConnector = new EISConnectorImpl("XI", appConfig.eisXiConfig, appConfig.headerCarrierConfig, httpClientV2, retries, metrics)
 }

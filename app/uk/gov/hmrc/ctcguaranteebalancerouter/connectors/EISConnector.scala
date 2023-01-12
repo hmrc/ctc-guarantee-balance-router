@@ -18,6 +18,7 @@ package uk.gov.hmrc.ctcguaranteebalancerouter.connectors
 
 import akka.stream.Materializer
 import cats.data.EitherT
+import com.kenshoo.play.metrics.Metrics
 import play.api.Logging
 import play.api.http.HeaderNames
 import play.api.http.MimeTypes
@@ -27,6 +28,8 @@ import retry.RetryDetails
 import uk.gov.hmrc.ctcguaranteebalancerouter.config.CircuitBreakerConfig
 import uk.gov.hmrc.ctcguaranteebalancerouter.config.EISInstanceConfig
 import uk.gov.hmrc.ctcguaranteebalancerouter.config.RetryConfig
+import uk.gov.hmrc.ctcguaranteebalancerouter.metrics.HasMetrics
+import uk.gov.hmrc.ctcguaranteebalancerouter.metrics.MetricsKeys
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.AccessCodeRequest
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.GuaranteeReferenceNumber
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.errors.RoutingError
@@ -54,11 +57,13 @@ class EISConnectorImpl(
   eisInstanceConfig: EISInstanceConfig,
   headerCarrierConfig: HeaderCarrier.Config,
   httpClientV2: HttpClientV2,
-  val retries: Retries
+  val retries: Retries,
+  val metrics: Metrics
 )(implicit val materializer: Materializer)
     extends EISConnector
     with EndpointProtection
-    with Logging {
+    with Logging
+    with HasMetrics {
 
   override val retryConfig: RetryConfig = eisInstanceConfig.retryConfig
 
@@ -82,20 +87,22 @@ class EISConnectorImpl(
           .copy(authorization = None, otherHeaders = Seq.empty)
           .withExtraHeaders(requestHeaders: _*)
 
-        httpClientV2
-          .post(url"${eisInstanceConfig.accessCodeUrl}")
-          .withBody(request)
-          .setHeader(headerCarrier.headersForUrl(headerCarrierConfig)(eisInstanceConfig.accessCodeUrl): _*)
-          .execute[Either[UpstreamErrorResponse, HttpResponse]]
-          .map {
-            case Right(httpResponse)         => Right(httpResponse.json)
-            case Left(upstreamErrorResponse) => Left(RoutingError.Upstream(upstreamErrorResponse))
-          }
-          .recover {
-            case NonFatal(e) =>
-              logger.error(s"Request Error: Routing to $code failed to retrieve data with message ${e.getMessage}. Correlation ID: $correlationId.")
-              Left[RoutingError, JsValue](RoutingError.Unexpected("message", Some(e)))
-          }
+        withMetricsTimerResponse(MetricsKeys.eisAccessCodeEndpoint) {
+          httpClientV2
+            .post(url"${eisInstanceConfig.accessCodeUrl}")
+            .withBody(request)
+            .setHeader(headerCarrier.headersForUrl(headerCarrierConfig)(eisInstanceConfig.accessCodeUrl): _*)
+            .execute[Either[UpstreamErrorResponse, HttpResponse]]
+            .map {
+              case Right(httpResponse)         => Right(httpResponse.json)
+              case Left(upstreamErrorResponse) => Left(RoutingError.Upstream(upstreamErrorResponse))
+            }
+            .recover {
+              case NonFatal(e) =>
+                logger.error(s"Request Error: Routing to $code failed to retrieve data with message ${e.getMessage}. Correlation ID: $correlationId.")
+                Left[RoutingError, JsValue](RoutingError.Unexpected("message", Some(e)))
+            }
+        }
       }
     }
   }
