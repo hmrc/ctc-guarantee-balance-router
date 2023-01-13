@@ -309,7 +309,7 @@ class EISConnectorSpec
               .willReturn(
                 aResponse()
                   .withStatus(codeToReturn)
-                  .withBody(Json.stringify(Json.obj("GRN" -> grn.value, "balance" -> 123.45)))
+                  .withBody(Json.stringify(Json.obj("GRN" -> grn.value, "remainingBalance" -> 123.45)))
               )
               .willSetStateTo(targetState)
           )
@@ -342,7 +342,7 @@ class EISConnectorSpec
             .willReturn(
               aResponse()
                 .withStatus(codeToReturn)
-                .withBody(Json.stringify(Json.obj("GRN" -> "abc", "balance" -> 1234.56)))
+                .withBody(Json.stringify(Json.obj("GRN" -> "abc", "remainingBalance" -> 1234.56)))
             )
         )
 

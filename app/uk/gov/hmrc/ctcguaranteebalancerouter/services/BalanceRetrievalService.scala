@@ -45,7 +45,7 @@ class BalanceRetrievalServiceImpl @Inject() (connectorProvider: EISConnectorProv
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): EitherT[Future, BalanceRetrievalError, Balance] =
-    connectorProvider(countryCode).postBalanceRequest(grn, hc).map(_.balance).leftMap(handleConnectorError)
+    connectorProvider(countryCode).postBalanceRequest(grn, hc).map(_.remainingBalance).leftMap(handleConnectorError)
 
   private def handleConnectorError(error: ConnectorError): BalanceRetrievalError = error match {
     case ConnectorError.Upstream(err)            => BalanceRetrievalError.Unexpected("Upstream Error", Some(err))

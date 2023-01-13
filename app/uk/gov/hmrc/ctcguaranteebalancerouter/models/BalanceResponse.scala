@@ -22,4 +22,4 @@ object BalanceResponse {
   implicit val balanceResponseFormat = Json.format[BalanceResponse]
 }
 
-case class BalanceResponse(GRN: GuaranteeReferenceNumber, balance: Balance)
+case class BalanceResponse(GRN: GuaranteeReferenceNumber, remainingBalance: Balance)
