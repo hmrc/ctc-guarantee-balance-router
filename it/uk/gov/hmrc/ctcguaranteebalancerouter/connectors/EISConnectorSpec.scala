@@ -177,7 +177,7 @@ class EISConnectorSpec
         }
     }
 
-    "return JsValue when post is successful on retry if there is an initial failure" in {
+    "return an AccessCodeResponse when post is successful on retry if there is an initial failure" in {
       def stub(currentState: String, targetState: String, codeToReturn: Int) =
         server.stubFor(
           post(
@@ -327,7 +327,7 @@ class EISConnectorSpec
         }
     }
 
-    "return JsValue when post is successful on retry if there is an initial failure" in {
+    "return BalanceResponse when post is successful on retry if there is an initial failure" in {
       def stub(currentState: String, targetState: String, codeToReturn: Int) =
         server.stubFor(
           post(
