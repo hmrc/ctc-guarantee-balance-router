@@ -19,6 +19,7 @@ package uk.gov.hmrc.ctcguaranteebalancerouter.utils
 import org.scalacheck.Arbitrary
 import org.scalacheck.Gen
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.AccessCode
+import uk.gov.hmrc.ctcguaranteebalancerouter.models.Balance
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.CountryCode
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.GuaranteeReferenceNumber
 
@@ -45,6 +46,15 @@ trait Generators {
 
   implicit val arbitraryCountryCode: Arbitrary[CountryCode] = Arbitrary {
     Gen.oneOf(CountryCode.Gb, CountryCode.Xi)
+  }
+
+  implicit val arbitraryBalance: Arbitrary[Balance] = Arbitrary {
+    Gen
+      .posNum[Int]
+      .map(
+        r => r.toDouble / 100.0
+      )
+      .map(Balance(_))
   }
 
 }

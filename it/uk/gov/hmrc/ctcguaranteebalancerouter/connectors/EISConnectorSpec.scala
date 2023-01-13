@@ -92,6 +92,7 @@ class EISConnectorSpec
   }
 
   val accessCodeUri = "/ctc-guarantee-balance-eis-stub/guarantee/accessCode"
+  val balanceUri    = "/ctc-guarantee-balance-eis-stub/guarantee/balance"
 
   val connectorConfig: EISInstanceConfig = EISInstanceConfig(
     "http",
@@ -99,7 +100,7 @@ class EISConnectorSpec
     wiremockPort,
     EISURIsConfig(
       accessCodeUri,
-      "/ctc-guarantee-balance-eis-stub/guarantee/balance"
+      balanceUri
     ),
     Headers("bearertokenhereGB"),
     CircuitBreakerConfig(
@@ -170,13 +171,13 @@ class EISConnectorSpec
         val hc = HeaderCarrier()
 
         whenReady(connector().postAccessCodeRequest(grn, hc).value) {
-          case Right(AccessCodeResponse(grn, AccessCode("ABCD"))) => succeed
-          case Right(x)                                           => fail(s"Got $x, which was not expected")
-          case Left(ex)                                           => fail(s"Failed with ${ex.toString}")
+          case Right(AccessCodeResponse(_, AccessCode("ABCD"))) => succeed
+          case Right(x)                                         => fail(s"Got $x, which was not expected")
+          case Left(ex)                                         => fail(s"Failed with ${ex.toString}")
         }
     }
 
-    "return JsValue when post is successful on retry if there is an initial failure" in {
+    "return an AccessCodeResponse when post is successful on retry if there is an initial failure" in {
       def stub(currentState: String, targetState: String, codeToReturn: Int) =
         server.stubFor(
           post(
@@ -235,7 +236,6 @@ class EISConnectorSpec
 
     Seq(
       INTERNAL_SERVER_ERROR,
-      BAD_GATEWAY,
       GATEWAY_TIMEOUT
     ).foreach {
       statusCode =>
@@ -272,6 +272,133 @@ class EISConnectorSpec
       when(httpClientV2.post(ArgumentMatchers.any[URL])(ArgumentMatchers.any[HeaderCarrier])).thenReturn(new FakeRequestBuilder)
 
       whenReady(connector.postAccessCodeRequest(GuaranteeReferenceNumber("abc"), hc).value) {
+        case Left(x) if x.isInstanceOf[ConnectorError.Unexpected] => x.asInstanceOf[ConnectorError.Unexpected].cause.get mustBe a[RuntimeException]
+        case _                                                    => fail("Left was not a RoutingError.Unexpected")
+      }
+    }
+  }
+
+  "postBalanceRequest" should {
+
+    "add CustomProcessHost and X-Correlation-Id headers to messages for GB and return a Right when successful" in forAll(
+      connectorGen,
+      Arbitrary.arbitrary[GuaranteeReferenceNumber]
+    ) {
+      (connector, grn) =>
+        server.resetAll() // Need to reset due to the forAll - it's technically the same test
+
+        // Important note: while this test considers successes, as this connector has a retry function,
+        // we have to ensure that any success result is not retried. To do this, we make the stub return
+        // a 202 status the first time it is called, then we transition it into a state where it'll return
+        // an error. As the retry algorithm should not attempt a retry on a 202, the stub should only be
+        // called once - so a 500 should never be returned.
+        //
+        // If a 500 error is returned, this most likely means a retry happened, the first place to look
+        // should be the code the determines if a result is successful.
+
+        def stub(currentState: String, targetState: String, codeToReturn: Int) =
+          server.stubFor(
+            post(
+              urlEqualTo(balanceUri)
+            )
+              .inScenario("Standard Call")
+              .whenScenarioStateIs(currentState)
+              .withHeader("X-Correlation-Id", matching(RegexPatterns.UUID))
+              .withHeader("CustomProcessHost", equalTo("Digital"))
+              .withHeader(HeaderNames.ACCEPT, equalTo("application/json"))
+              .willReturn(
+                aResponse()
+                  .withStatus(codeToReturn)
+                  .withBody(Json.stringify(Json.obj("GRN" -> grn.value, "remainingBalance" -> 123.45)))
+              )
+              .willSetStateTo(targetState)
+          )
+
+        val secondState = "should now fail"
+
+        stub(Scenario.STARTED, secondState, OK)
+        stub(secondState, secondState, INTERNAL_SERVER_ERROR)
+
+        val hc = HeaderCarrier()
+
+        whenReady(connector().postBalanceRequest(grn, hc).value) {
+          case Right(_) => succeed
+          case Left(ex) => fail(s"Failed with ${ex.toString}")
+        }
+    }
+
+    "return BalanceResponse when post is successful on retry if there is an initial failure" in {
+      def stub(currentState: String, targetState: String, codeToReturn: Int) =
+        server.stubFor(
+          post(
+            urlEqualTo(balanceUri)
+          )
+            .inScenario("Flaky Call")
+            .whenScenarioStateIs(currentState)
+            .willSetStateTo(targetState)
+            .withHeader("Authorization", equalTo("Bearer bearertokenhereGB"))
+            .withHeader(HeaderNames.ACCEPT, equalTo("application/json"))
+            .withHeader("X-Correlation-Id", matching(RegexPatterns.UUID))
+            .willReturn(
+              aResponse()
+                .withStatus(codeToReturn)
+                .withBody(Json.stringify(Json.obj("GRN" -> "abc", "remainingBalance" -> 1234.56)))
+            )
+        )
+
+      val secondState = "should now succeed"
+
+      stub(Scenario.STARTED, secondState, INTERNAL_SERVER_ERROR)
+      stub(secondState, secondState, OK)
+
+      val hc = HeaderCarrier()
+
+      whenReady(oneRetryConnector.postBalanceRequest(GuaranteeReferenceNumber("abc"), hc).value) {
+        case Right(_) => succeed
+        case Left(ex) => fail(s"Failed with ${ex.toString}")
+      }
+    }
+
+    Seq(
+      FORBIDDEN,
+      INTERNAL_SERVER_ERROR,
+      BAD_GATEWAY,
+      GATEWAY_TIMEOUT
+    ).foreach {
+      statusCode =>
+        s"pass through error status code $statusCode" in forAll(connectorGen) {
+          connector =>
+            server.resetAll() // Need to reset due to the forAll - it's technically the same test
+
+            server.stubFor(
+              post(
+                urlEqualTo(balanceUri)
+              ).withHeader("Authorization", equalTo("Bearer bearertokenhereGB"))
+                .withHeader(HeaderNames.ACCEPT, equalTo("application/json"))
+                .withHeader("X-Correlation-Id", matching(RegexPatterns.UUID))
+                .willReturn(aResponse().withStatus(statusCode))
+            )
+
+            val hc = HeaderCarrier()
+
+            whenReady(connector().postBalanceRequest(GuaranteeReferenceNumber("abc"), hc).value) {
+              case Left(x: ConnectorError.Upstream) =>
+                x.upstreamErrorResponse.statusCode mustBe statusCode
+              case x =>
+                fail(s"Left was not a RoutingError.Upstream (got $x)")
+            }
+        }
+    }
+
+    "handle exceptions by returning an HttpResponse with status code 500" in {
+      val httpClientV2 = mock[HttpClientV2]
+
+      val hc        = HeaderCarrier()
+      val connector = new EISConnectorImpl("Failure", connectorConfig, TestHelpers.headerCarrierConfig, httpClientV2, NoRetries, new TestMetrics)
+
+      when(httpClientV2.post(ArgumentMatchers.any[URL])(ArgumentMatchers.any[HeaderCarrier])).thenReturn(new FakeRequestBuilder)
+
+      whenReady(connector.postBalanceRequest(GuaranteeReferenceNumber("abc"), hc).value) {
         case Left(x) if x.isInstanceOf[ConnectorError.Unexpected] => x.asInstanceOf[ConnectorError.Unexpected].cause.get mustBe a[RuntimeException]
         case _                                                    => fail("Left was not a RoutingError.Unexpected")
       }

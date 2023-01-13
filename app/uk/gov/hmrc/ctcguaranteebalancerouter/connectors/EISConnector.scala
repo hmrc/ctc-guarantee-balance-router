@@ -27,14 +27,16 @@ import play.api.http.Status.NOT_FOUND
 import play.api.libs.json.JsError
 import play.api.libs.json.JsSuccess
 import play.api.libs.json.Json
+import play.api.libs.json.Reads
 import retry.RetryDetails
 import uk.gov.hmrc.ctcguaranteebalancerouter.config.CircuitBreakerConfig
 import uk.gov.hmrc.ctcguaranteebalancerouter.config.EISInstanceConfig
 import uk.gov.hmrc.ctcguaranteebalancerouter.config.RetryConfig
 import uk.gov.hmrc.ctcguaranteebalancerouter.metrics.HasMetrics
 import uk.gov.hmrc.ctcguaranteebalancerouter.metrics.MetricsKeys
-import uk.gov.hmrc.ctcguaranteebalancerouter.models.AccessCodeRequest
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.AccessCodeResponse
+import uk.gov.hmrc.ctcguaranteebalancerouter.models.BalanceResponse
+import uk.gov.hmrc.ctcguaranteebalancerouter.models.GrnBasedRequest
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.GuaranteeReferenceNumber
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.errors.ConnectorError
 import uk.gov.hmrc.http.HeaderCarrier
@@ -43,6 +45,7 @@ import uk.gov.hmrc.http.HttpResponse
 import uk.gov.hmrc.http.StringContextOps
 import uk.gov.hmrc.http.UpstreamErrorResponse
 import uk.gov.hmrc.http.client.HttpClientV2
+import uk.gov.hmrc.http.client.RequestBuilder
 import uk.gov.hmrc.http.{HeaderNames => HMRCHeaderNames}
 
 import java.util.UUID
@@ -55,6 +58,8 @@ trait EISConnector {
   def postAccessCodeRequest(grn: GuaranteeReferenceNumber, hc: HeaderCarrier)(implicit
     ec: ExecutionContext
   ): EitherT[Future, ConnectorError, AccessCodeResponse]
+
+  def postBalanceRequest(grn: GuaranteeReferenceNumber, hc: HeaderCarrier)(implicit ec: ExecutionContext): EitherT[Future, ConnectorError, BalanceResponse]
 
 }
 
@@ -77,11 +82,32 @@ class EISConnectorImpl(
 
   override def postAccessCodeRequest(grn: GuaranteeReferenceNumber, hc: HeaderCarrier)(implicit
     ec: ExecutionContext
-  ): EitherT[Future, ConnectorError, AccessCodeResponse] = {
-    val request = Json.toJson(AccessCodeRequest(grn))
+  ): EitherT[Future, ConnectorError, AccessCodeResponse] =
+    post(hc, MetricsKeys.eisAccessCodeEndpoint) {
+      createRequest(grn, eisInstanceConfig.accessCodeUrl)
+    }
+
+  override def postBalanceRequest(grn: GuaranteeReferenceNumber, hc: HeaderCarrier)(implicit
+    ec: ExecutionContext
+  ): EitherT[Future, ConnectorError, BalanceResponse] =
+    post(hc, MetricsKeys.eisGetBalanceEndpoint) {
+      createRequest(grn, eisInstanceConfig.balanceUrl)
+    }
+
+  private def createRequest(grn: GuaranteeReferenceNumber, uri: String)(hc: HeaderCarrier)(implicit ec: ExecutionContext): RequestBuilder = {
+    val request = Json.toJson(GrnBasedRequest(grn))
+    httpClientV2
+      .post(url"$uri")(hc)
+      .withBody(request)
+      .setHeader(hc.headersForUrl(headerCarrierConfig)(uri): _*)
+  }
+
+  private def post[A](hc: HeaderCarrier, metricsKey: String)(
+    call: HeaderCarrier => RequestBuilder
+  )(implicit ec: ExecutionContext, reads: Reads[A]): EitherT[Future, ConnectorError, A] =
     EitherT {
-      protect(isFailure[AccessCodeResponse], isFailure[AccessCodeResponse], retryLogging) {
-        val correlationId = UUID.randomUUID().toString;
+      protect(isFailure[A], isFailure[A], retryLogging) {
+        val correlationId = UUID.randomUUID().toString
         val requestHeaders = hc.headers(Seq(HMRCHeaderNames.xRequestId)) ++ Seq(
           "X-Correlation-Id"        -> correlationId,
           "CustomProcessHost"       -> "Digital",
@@ -93,15 +119,12 @@ class EISConnectorImpl(
           .copy(authorization = None, otherHeaders = Seq.empty)
           .withExtraHeaders(requestHeaders: _*)
 
-        withMetricsTimerResponse(MetricsKeys.eisAccessCodeEndpoint) {
-          httpClientV2
-            .post(url"${eisInstanceConfig.accessCodeUrl}")
-            .withBody(request)
-            .setHeader(headerCarrier.headersForUrl(headerCarrierConfig)(eisInstanceConfig.accessCodeUrl): _*)
+        withMetricsTimerResponse(metricsKey) {
+          call(headerCarrier)
             .execute[Either[UpstreamErrorResponse, HttpResponse]]
-            .map[Either[ConnectorError, AccessCodeResponse]] {
+            .map[Either[ConnectorError, A]] {
               case Right(httpResponse) =>
-                httpResponse.json.validate[AccessCodeResponse] match {
+                httpResponse.json.validate[A] match {
                   case JsSuccess(value, _) => Right(value)
                   case JsError(_)          => Left(ConnectorError.FailedToDeserialise)
                 }
@@ -117,7 +140,6 @@ class EISConnectorImpl(
         }
       }
     }
-  }
 
   private def isFailure[A](either: Either[ConnectorError, A]): Boolean = either match {
     case Right(_)                                                                                       => false

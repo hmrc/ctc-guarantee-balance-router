@@ -14,11 +14,12 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.ctcguaranteebalancerouter.models
+package uk.gov.hmrc.ctcguaranteebalancerouter.models.errors
 
-import play.api.libs.json.Json
+sealed trait BalanceRetrievalError
 
-object AccessCodeRequest {
-  implicit val accessCodeRequestFormat = Json.format[AccessCodeRequest]
+object BalanceRetrievalError {
+  case object FailedToDeserialise extends BalanceRetrievalError
+
+  case class Unexpected(message: String, thr: Option[Throwable]) extends BalanceRetrievalError
 }
-case class AccessCodeRequest(GRN: GuaranteeReferenceNumber)
