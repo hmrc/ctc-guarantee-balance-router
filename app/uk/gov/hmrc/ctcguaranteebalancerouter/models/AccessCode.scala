@@ -18,8 +18,8 @@ package uk.gov.hmrc.ctcguaranteebalancerouter.models
 
 import play.api.libs.json.Json
 
-object GuaranteeReferenceNumber {
-  implicit val guaranteeReferenceNumberFormat = Json.valueFormat[GuaranteeReferenceNumber]
+object AccessCode {
+  implicit val accessCodeFormat = Json.valueFormat[AccessCode]
 }
 
-case class GuaranteeReferenceNumber(value: String) extends AnyVal
+case class AccessCode(value: String) extends AnyVal

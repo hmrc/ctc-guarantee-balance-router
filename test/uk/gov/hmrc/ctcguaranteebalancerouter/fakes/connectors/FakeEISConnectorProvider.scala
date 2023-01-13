@@ -14,12 +14,9 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.ctcguaranteebalancerouter.models
+package uk.gov.hmrc.ctcguaranteebalancerouter.fakes.connectors
 
-import play.api.libs.json.Json
+import uk.gov.hmrc.ctcguaranteebalancerouter.connectors.EISConnector
+import uk.gov.hmrc.ctcguaranteebalancerouter.connectors.EISConnectorProvider
 
-object GuaranteeReferenceNumber {
-  implicit val guaranteeReferenceNumberFormat = Json.valueFormat[GuaranteeReferenceNumber]
-}
-
-case class GuaranteeReferenceNumber(value: String) extends AnyVal
+case class FakeEISConnectorProvider(gb: EISConnector, xi: EISConnector) extends EISConnectorProvider

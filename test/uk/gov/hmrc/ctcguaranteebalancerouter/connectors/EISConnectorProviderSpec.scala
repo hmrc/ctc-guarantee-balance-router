@@ -22,7 +22,7 @@ import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.must.Matchers
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.CountryCode
-import uk.gov.hmrc.ctcguaranteebalancerouter.uils.Generators
+import uk.gov.hmrc.ctcguaranteebalancerouter.utils.Generators
 
 class EISConnectorProviderSpec extends AnyFreeSpec with Matchers with MockitoSugar with ScalaCheckDrivenPropertyChecks with ScalaFutures with Generators {
 

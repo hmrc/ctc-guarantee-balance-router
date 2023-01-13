@@ -14,12 +14,15 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.ctcguaranteebalancerouter.models
+package uk.gov.hmrc.ctcguaranteebalancerouter.models.errors
 
-import play.api.libs.json.Json
+import uk.gov.hmrc.http.UpstreamErrorResponse
 
-object GuaranteeReferenceNumber {
-  implicit val guaranteeReferenceNumberFormat = Json.valueFormat[GuaranteeReferenceNumber]
+sealed trait ConnectorError
+
+object ConnectorError {
+  case object NotFound                                              extends ConnectorError
+  case object FailedToDeserialise                                   extends ConnectorError
+  case class Upstream(upstreamErrorResponse: UpstreamErrorResponse) extends ConnectorError
+  case class Unexpected(message: String, cause: Option[Throwable])  extends ConnectorError
 }
-
-case class GuaranteeReferenceNumber(value: String) extends AnyVal

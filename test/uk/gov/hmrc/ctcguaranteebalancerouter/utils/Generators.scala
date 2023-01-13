@@ -14,10 +14,12 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.ctcguaranteebalancerouter.uils
+package uk.gov.hmrc.ctcguaranteebalancerouter.utils
 
 import org.scalacheck.Arbitrary
 import org.scalacheck.Gen
+import uk.gov.hmrc.ctcguaranteebalancerouter.models.AccessCode
+import uk.gov.hmrc.ctcguaranteebalancerouter.models.CountryCode
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.GuaranteeReferenceNumber
 
 trait Generators {
@@ -36,5 +38,13 @@ trait Generators {
       alpha    <- Gen.alphaChar.map(_.toString.toUpperCase)
       num      <- Gen.stringOfN(6, Gen.numChar)
     } yield GuaranteeReferenceNumber(s"$year$country$alphanum$num1$alpha$num")
+
+  implicit val arbitraryAccessCode: Arbitrary[AccessCode] = Arbitrary {
+    Gen.stringOfN(4, Gen.alphaNumChar).map(AccessCode(_))
+  }
+
+  implicit val arbitraryCountryCode: Arbitrary[CountryCode] = Arbitrary {
+    Gen.oneOf(CountryCode.Gb, CountryCode.Xi)
+  }
 
 }

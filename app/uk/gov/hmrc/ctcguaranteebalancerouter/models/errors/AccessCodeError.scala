@@ -14,12 +14,13 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.ctcguaranteebalancerouter.models
+package uk.gov.hmrc.ctcguaranteebalancerouter.models.errors
 
-import play.api.libs.json.Json
+sealed trait AccessCodeError
 
-object GuaranteeReferenceNumber {
-  implicit val guaranteeReferenceNumberFormat = Json.valueFormat[GuaranteeReferenceNumber]
+object AccessCodeError {
+  case object InvalidAccessCode                                  extends AccessCodeError
+  case object FailedToDeserialise                                extends AccessCodeError
+  case object NotFound                                           extends AccessCodeError
+  case class Unexpected(message: String, thr: Option[Throwable]) extends AccessCodeError
 }
-
-case class GuaranteeReferenceNumber(value: String) extends AnyVal

@@ -16,6 +16,141 @@
 
 package uk.gov.hmrc.ctcguaranteebalancerouter.connectors
 
-trait EISConnector
+import akka.stream.Materializer
+import cats.data.EitherT
+import com.kenshoo.play.metrics.Metrics
+import play.api.Logging
+import play.api.http.HeaderNames
+import play.api.http.MimeTypes
+import play.api.http.Status.BAD_REQUEST
+import play.api.http.Status.NOT_FOUND
+import play.api.libs.json.JsError
+import play.api.libs.json.JsSuccess
+import play.api.libs.json.Json
+import retry.RetryDetails
+import uk.gov.hmrc.ctcguaranteebalancerouter.config.CircuitBreakerConfig
+import uk.gov.hmrc.ctcguaranteebalancerouter.config.EISInstanceConfig
+import uk.gov.hmrc.ctcguaranteebalancerouter.config.RetryConfig
+import uk.gov.hmrc.ctcguaranteebalancerouter.metrics.HasMetrics
+import uk.gov.hmrc.ctcguaranteebalancerouter.metrics.MetricsKeys
+import uk.gov.hmrc.ctcguaranteebalancerouter.models.AccessCodeRequest
+import uk.gov.hmrc.ctcguaranteebalancerouter.models.AccessCodeResponse
+import uk.gov.hmrc.ctcguaranteebalancerouter.models.GuaranteeReferenceNumber
+import uk.gov.hmrc.ctcguaranteebalancerouter.models.errors.ConnectorError
+import uk.gov.hmrc.http.HeaderCarrier
+import uk.gov.hmrc.http.HttpReads.Implicits._
+import uk.gov.hmrc.http.HttpResponse
+import uk.gov.hmrc.http.StringContextOps
+import uk.gov.hmrc.http.UpstreamErrorResponse
+import uk.gov.hmrc.http.client.HttpClientV2
+import uk.gov.hmrc.http.{HeaderNames => HMRCHeaderNames}
 
-class EISConnectorImpl extends EISConnector
+import java.util.UUID
+import scala.concurrent.ExecutionContext
+import scala.concurrent.Future
+import scala.util.control.NonFatal
+
+trait EISConnector {
+
+  def postAccessCodeRequest(grn: GuaranteeReferenceNumber, hc: HeaderCarrier)(implicit
+    ec: ExecutionContext
+  ): EitherT[Future, ConnectorError, AccessCodeResponse]
+
+}
+
+class EISConnectorImpl(
+  val code: String,
+  eisInstanceConfig: EISInstanceConfig,
+  headerCarrierConfig: HeaderCarrier.Config,
+  httpClientV2: HttpClientV2,
+  val retries: Retries,
+  val metrics: Metrics
+)(implicit val materializer: Materializer)
+    extends EISConnector
+    with EndpointProtection
+    with Logging
+    with HasMetrics {
+
+  override val retryConfig: RetryConfig = eisInstanceConfig.retryConfig
+
+  override val circuitBreakerConfig: CircuitBreakerConfig = eisInstanceConfig.circuitBreaker
+
+  override def postAccessCodeRequest(grn: GuaranteeReferenceNumber, hc: HeaderCarrier)(implicit
+    ec: ExecutionContext
+  ): EitherT[Future, ConnectorError, AccessCodeResponse] = {
+    val request = Json.toJson(AccessCodeRequest(grn))
+    EitherT {
+      protect(isFailure[AccessCodeResponse], isFailure[AccessCodeResponse], retryLogging) {
+        val correlationId = UUID.randomUUID().toString;
+        val requestHeaders = hc.headers(Seq(HMRCHeaderNames.xRequestId)) ++ Seq(
+          "X-Correlation-Id"        -> correlationId,
+          "CustomProcessHost"       -> "Digital",
+          HeaderNames.ACCEPT        -> MimeTypes.JSON,
+          HeaderNames.AUTHORIZATION -> s"Bearer ${eisInstanceConfig.headers.bearerToken}"
+        )
+
+        implicit val headerCarrier: HeaderCarrier = hc
+          .copy(authorization = None, otherHeaders = Seq.empty)
+          .withExtraHeaders(requestHeaders: _*)
+
+        withMetricsTimerResponse(MetricsKeys.eisAccessCodeEndpoint) {
+          httpClientV2
+            .post(url"${eisInstanceConfig.accessCodeUrl}")
+            .withBody(request)
+            .setHeader(headerCarrier.headersForUrl(headerCarrierConfig)(eisInstanceConfig.accessCodeUrl): _*)
+            .execute[Either[UpstreamErrorResponse, HttpResponse]]
+            .map[Either[ConnectorError, AccessCodeResponse]] {
+              case Right(httpResponse) =>
+                httpResponse.json.validate[AccessCodeResponse] match {
+                  case JsSuccess(value, _) => Right(value)
+                  case JsError(_)          => Left(ConnectorError.FailedToDeserialise)
+                }
+              // TODO: Improve once we know what EIS will do
+              case Left(UpstreamErrorResponse(_, statusCode, _, _)) if statusCode == BAD_REQUEST || statusCode == NOT_FOUND => Left(ConnectorError.NotFound)
+              case Left(upstreamErrorResponse)                                                                              => Left(ConnectorError.Upstream(upstreamErrorResponse))
+            }
+            .recover {
+              case NonFatal(e) =>
+                logger.error(s"Request Error: Routing to $code failed to retrieve data with message ${e.getMessage}. Correlation ID: $correlationId.")
+                Left(ConnectorError.Unexpected("message", Some(e)))
+            }
+        }
+      }
+    }
+  }
+
+  private def isFailure[A](either: Either[ConnectorError, A]): Boolean = either match {
+    case Right(_)                                                                                       => false
+    case Left(ConnectorError.Upstream(UpstreamErrorResponse(_, statusCode, _, _))) if statusCode <= 499 => false
+    case _                                                                                              => true
+  }
+
+  def retryLogging(response: Either[ConnectorError, _], retryDetails: RetryDetails): Unit =
+    response match {
+      case Left(ConnectorError.Upstream(upstreamErrorResponse)) =>
+        logAttemptedRetry(s"with status code ${upstreamErrorResponse.statusCode}", retryDetails)
+      case Left(ConnectorError.Unexpected(message, _)) => logAttemptedRetry(s"with error $message", retryDetails)
+      case _                                           => ()
+    }
+
+  private def logAttemptedRetry(message: String, retryDetails: RetryDetails): Unit = {
+    val attemptNumber = retryDetails.retriesSoFar + 1
+    if (retryDetails.givingUp) {
+      logger.error(
+        s"Message when routing to $code failed $message\n" +
+          s"Attempted $attemptNumber times in ${retryDetails.cumulativeDelay.toSeconds} seconds, giving up."
+      )
+    } else {
+      val nextAttempt =
+        retryDetails.upcomingDelay
+          .map(
+            d => s"in ${d.toSeconds} seconds"
+          )
+          .getOrElse("immediately")
+      logger.warn(
+        s"Message when routing to $code failed with $message\n" +
+          s"Attempted $attemptNumber times in ${retryDetails.cumulativeDelay.toSeconds} seconds so far, trying again $nextAttempt."
+      )
+    }
+  }
+}

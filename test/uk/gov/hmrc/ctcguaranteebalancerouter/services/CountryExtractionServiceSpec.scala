@@ -25,7 +25,7 @@ import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.CountryCode
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.GuaranteeReferenceNumber
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.errors.CountryExtractionError
-import uk.gov.hmrc.ctcguaranteebalancerouter.uils.Generators
+import uk.gov.hmrc.ctcguaranteebalancerouter.utils.Generators
 
 import scala.concurrent.Await
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -56,7 +56,7 @@ class CountryExtractionServiceSpec extends AnyFreeSpec with Matchers with ScalaC
         result mustBe Left(CountryExtractionError.InvalidCountryCode("FR"))
     }
 
-    "on non UK but valid GRN, get invalid format error back" in forAll(Gen.stringOfN(5, Gen.alphaUpperChar).map(GuaranteeReferenceNumber)) {
+    "on non UK but valid GRN, get invalid format error back" in forAll(Gen.stringOfN(5, Gen.alphaUpperChar).map(GuaranteeReferenceNumber.apply)) {
       grn =>
         val result = Await.result(sut.extractCountry(grn).value, 2.seconds)
         result mustBe Left(CountryExtractionError.InvalidFormat(grn))

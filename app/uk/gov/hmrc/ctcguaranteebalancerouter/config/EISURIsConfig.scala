@@ -16,17 +16,19 @@
 
 package uk.gov.hmrc.ctcguaranteebalancerouter.config
 
-import javax.inject.Inject
-import javax.inject.Singleton
-import play.api.Configuration
-import uk.gov.hmrc.http.HeaderCarrier
+import play.api.ConfigLoader
 
-@Singleton
-class AppConfig @Inject() (config: Configuration) {
+object EISURIsConfig {
 
-  lazy val appName: String                           = config.get[String]("appName")
-  lazy val headerCarrierConfig: HeaderCarrier.Config = HeaderCarrier.Config.fromConfig(config.underlying)
-
-  lazy val eisGbConfig: EISInstanceConfig = config.get[EISInstanceConfig]("microservice.services.eis.gb")
-  lazy val eisXiConfig: EISInstanceConfig = config.get[EISInstanceConfig]("microservice.services.eis.xi")
+  implicit lazy val configLoader: ConfigLoader[EISURIsConfig] =
+    ConfigLoader {
+      rootConfig => path =>
+        val config = rootConfig.getConfig(path)
+        EISURIsConfig(
+          config.getString("accessCode"),
+          config.getString("balance")
+        )
+    }
 }
+
+case class EISURIsConfig(accessCode: String, balance: String)
