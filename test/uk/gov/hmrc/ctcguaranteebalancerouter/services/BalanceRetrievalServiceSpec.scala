@@ -77,7 +77,7 @@ class BalanceRetrievalServiceSpec extends AnyFreeSpec with Matchers with ScalaCh
         val sut = new BalanceRetrievalServiceImpl(FakeEISConnectorProvider(mockConnector, mockConnector))
 
         whenReady(sut.getBalance(grn, countryCode).value, Timeout(1.second)) {
-          _ mustBe Left(BalanceRetrievalError.InvalidJson)
+          _ mustBe Left(BalanceRetrievalError.FailedToDeserialise)
         }
     }
 

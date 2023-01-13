@@ -1,3 +1,4 @@
+import play.sbt.routes.RoutesKeys
 import uk.gov.hmrc.DefaultBuildSettings.integrationTestSettings
 import uk.gov.hmrc.sbtdistributables.SbtDistributablesPlugin
 import uk.gov.hmrc.sbtdistributables.SbtDistributablesPlugin.publishingSettings
@@ -12,6 +13,9 @@ lazy val microservice = Project("ctc-guarantee-balance-router", file("."))
     // https://www.scala-lang.org/2021/01/12/configuring-and-suppressing-warnings.html
     // suppress warnings in generated routes files
     scalacOptions += "-Wconf:src=routes/.*:s",
+    RoutesKeys.routesImport ++= Seq(
+      "uk.gov.hmrc.ctcguaranteebalancerouter.models._",
+    )
   )
   .settings(inThisBuild(buildSettings))
   .settings(publishingSettings: _*)

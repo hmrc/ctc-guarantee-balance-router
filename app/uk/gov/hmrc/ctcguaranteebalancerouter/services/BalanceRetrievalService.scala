@@ -50,7 +50,7 @@ class BalanceRetrievalServiceImpl @Inject() (connectorProvider: EISConnectorProv
   private def handleConnectorError(error: ConnectorError): BalanceRetrievalError = error match {
     case ConnectorError.Upstream(err)            => BalanceRetrievalError.Unexpected("Upstream Error", Some(err))
     case ConnectorError.Unexpected(message, err) => BalanceRetrievalError.Unexpected(message, err)
-    case ConnectorError.FailedToDeserialise      => BalanceRetrievalError.InvalidJson
+    case ConnectorError.FailedToDeserialise      => BalanceRetrievalError.FailedToDeserialise
     case ConnectorError.NotFound                 => BalanceRetrievalError.Unexpected("GRN Not Found", None)
   }
 

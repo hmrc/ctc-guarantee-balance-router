@@ -14,12 +14,11 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.ctcguaranteebalancerouter.models.errors
+package uk.gov.hmrc.ctcguaranteebalancerouter.models
 
-sealed trait BalanceRetrievalError
+import play.api.libs.json.Json
 
-object BalanceRetrievalError {
-  case object FailedToDeserialise extends BalanceRetrievalError
-
-  case class Unexpected(message: String, thr: Option[Throwable]) extends BalanceRetrievalError
+object RouterBalanceResponse {
+  implicit val routerBalanceResponseFormat = Json.format[RouterBalanceResponse]
 }
+case class RouterBalanceResponse(balance: Balance)
