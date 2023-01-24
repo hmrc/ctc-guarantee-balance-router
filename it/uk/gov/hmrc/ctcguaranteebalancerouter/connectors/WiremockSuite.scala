@@ -30,7 +30,9 @@ trait WiremockSuite extends BeforeAndAfterAll with BeforeAndAfterEach {
   protected val wiremockPort = 11111
 
   protected val wiremockConfig =
-    wireMockConfig().port(wiremockPort).notifier(new ConsoleNotifier(false))
+    wireMockConfig()
+      .port(wiremockPort)
+      .notifier(new ConsoleNotifier(false))
 
   protected val server: WireMockServer = new WireMockServer(wiremockConfig)
 

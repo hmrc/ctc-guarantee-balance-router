@@ -20,10 +20,12 @@ import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import com.github.tomakehurst.wiremock.client.WireMock._
 import com.github.tomakehurst.wiremock.stubbing.Scenario
-import org.mockito.ArgumentMatchers
+import org.mockito.ArgumentMatchers.any
+import org.mockito.ArgumentMatchers.anyString
 import org.mockito.MockitoSugar
 import org.scalacheck.Arbitrary
 import org.scalacheck.Gen
+import org.scalatest.BeforeAndAfterEach
 import org.scalatest.concurrent.IntegrationPatience
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.matchers.must.Matchers
@@ -31,6 +33,7 @@ import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.time.SpanSugar.convertIntToGrainOfTime
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
+import play.api.Logger
 import play.api.http.HeaderNames
 import play.api.libs.json.Json
 import play.api.test.Helpers._
@@ -64,6 +67,7 @@ import scala.concurrent.Future
 
 class EISConnectorSpec
     extends AnyWordSpec
+    with BeforeAndAfterEach
     with HttpClientV2Support
     with Matchers
     with WiremockSuite
@@ -118,14 +122,46 @@ class EISConnectorSpec
     )
   )
 
-  // We construct the connector each time to avoid issues with the circuit breaker
-  def noRetriesConnector = new EISConnectorImpl("NoRetry", connectorConfig, TestHelpers.headerCarrierConfig, httpClientV2, NoRetries, new TestMetrics)
+  val loggerMock: Logger = mock[Logger]
 
-  def oneRetryConnector = new EISConnectorImpl("OneRetry", connectorConfig, TestHelpers.headerCarrierConfig, httpClientV2, OneRetry, new TestMetrics)
+  // We construct the connector each time to avoid issues with the circuit breaker
+  def noRetriesConnector: EISConnectorImpl =
+    new EISConnectorImpl("NoRetry", connectorConfig, TestHelpers.headerCarrierConfig, httpClientV2, NoRetries, new TestMetrics) {
+      override protected val logger: Logger = loggerMock
+
+      override protected def logAttemptedRetry(message: String, retryDetails: RetryDetails): Unit = ()
+    }
+
+  def noRetriesConnectorWithRetryLogging: EISConnectorImpl =
+    new EISConnectorImpl("NoRetry", connectorConfig, TestHelpers.headerCarrierConfig, httpClientV2, NoRetries, new TestMetrics) {
+      override protected val logger: Logger = loggerMock
+    }
+
+  def oneRetryConnector: EISConnectorImpl =
+    new EISConnectorImpl("OneRetry", connectorConfig, TestHelpers.headerCarrierConfig, httpClientV2, OneRetry, new TestMetrics) {
+      override protected val logger: Logger = loggerMock
+
+      override protected def logAttemptedRetry(message: String, retryDetails: RetryDetails): Unit = ()
+    }
+
+  val errorTestConnector: EISConnectorImpl =
+    new EISConnectorImpl("NoRetry", connectorConfig, TestHelpers.headerCarrierConfig, httpClientV2, NoRetries, new TestMetrics) {
+      override protected val logger: Logger = loggerMock
+
+      override protected def logAttemptedRetry(message: String, retryDetails: RetryDetails): Unit = ()
+
+      override def protect[A](retryWhen: A => Boolean, circuitBreakWhen: A => Boolean, retryLogging: (A, RetryDetails) => Unit)(block: => Future[A])(implicit
+        ec: ExecutionContext
+      ): Future[A] =
+        super.protect(retryWhen, (_: A) => false, retryLogging)(block)(ec) // short circuit retries
+    }
 
   lazy val connectorGen: Gen[() => EISConnector] = Gen.oneOf(() => noRetriesConnector, () => oneRetryConnector)
 
   def source: Source[ByteString, _] = Source.single(ByteString.fromString("<test></test>"))
+
+  override def afterEach(): Unit =
+    reset(loggerMock)
 
   "postAccessCodeRequest" should {
 
@@ -171,7 +207,7 @@ class EISConnectorSpec
         val hc = HeaderCarrier()
 
         whenReady(connector().postAccessCodeRequest(grn, hc).value) {
-          case Right(AccessCodeResponse(_, AccessCode("ABCD"))) => succeed
+          case Right(AccessCodeResponse(_, AccessCode("ABCD"))) => verify(loggerMock, times(0)).error(anyString())(any())
           case Right(x)                                         => fail(s"Got $x, which was not expected")
           case Left(ex)                                         => fail(s"Failed with ${ex.toString}")
         }
@@ -204,7 +240,8 @@ class EISConnectorSpec
       val hc = HeaderCarrier()
 
       whenReady(oneRetryConnector.postAccessCodeRequest(GuaranteeReferenceNumber("abc"), hc).value) {
-        case Right(AccessCodeResponse(GuaranteeReferenceNumber("abc"), AccessCode("ABCD"))) => succeed
+        case Right(AccessCodeResponse(GuaranteeReferenceNumber("abc"), AccessCode("ABCD"))) =>
+          verify(loggerMock, times(1)).error(anyString())(any())
         case Right(x) =>
           fail(s"Got $x, which was not expected")
         case Left(ex) =>
@@ -229,7 +266,7 @@ class EISConnectorSpec
         val hc = HeaderCarrier()
 
         whenReady(connector().postAccessCodeRequest(GuaranteeReferenceNumber("abc"), hc).value) {
-          case Left(ConnectorError.NotFound) => succeed
+          case Left(ConnectorError.NotFound) => verify(loggerMock, times(0)).error(anyString())(any())
           case x                             => fail(s"Left was not a RoutingError.NotFound (got $x)")
         }
     }
@@ -239,41 +276,47 @@ class EISConnectorSpec
       GATEWAY_TIMEOUT
     ).foreach {
       statusCode =>
-        s"pass through error status code $statusCode" in forAll(connectorGen) {
-          connector =>
-            server.resetAll() // Need to reset due to the forAll - it's technically the same test
+        s"pass through error status code $statusCode" in {
+          server.resetAll() // Need to reset due to the forAll - it's technically the same test
 
-            server.stubFor(
-              post(
-                urlEqualTo(accessCodeUri)
-              ).withHeader("Authorization", equalTo("Bearer bearertokenhereGB"))
-                .withHeader(HeaderNames.ACCEPT, equalTo("application/json"))
-                .withHeader("X-Correlation-Id", matching(RegexPatterns.UUID))
-                .willReturn(aResponse().withStatus(statusCode))
-            )
+          server.stubFor(
+            post(
+              urlEqualTo(accessCodeUri)
+            ).withHeader("Authorization", equalTo("Bearer bearertokenhereGB"))
+              .withHeader(HeaderNames.ACCEPT, equalTo("application/json"))
+              .withHeader("X-Correlation-Id", matching(RegexPatterns.UUID))
+              .willReturn(aResponse().withStatus(statusCode))
+          )
 
-            val hc = HeaderCarrier()
+          val hc = HeaderCarrier()
 
-            whenReady(connector().postAccessCodeRequest(GuaranteeReferenceNumber("abc"), hc).value) {
-              case Left(x: ConnectorError.Upstream) =>
-                x.upstreamErrorResponse.statusCode mustBe statusCode
-              case x =>
-                fail(s"Left was not a RoutingError.Upstream (got $x)")
-            }
+          whenReady(errorTestConnector.postAccessCodeRequest(GuaranteeReferenceNumber("abc"), hc).value) {
+            case Left(x: ConnectorError.Upstream) =>
+              verify(loggerMock, times(1)).error(anyString())(any())
+              x.upstreamErrorResponse.statusCode mustBe statusCode
+            case x =>
+              fail(s"Left was not a RoutingError.Upstream (got $x)")
+          }
         }
     }
 
     "handle exceptions by returning an HttpResponse with status code 500" in {
       val httpClientV2 = mock[HttpClientV2]
 
-      val hc        = HeaderCarrier()
-      val connector = new EISConnectorImpl("Failure", connectorConfig, TestHelpers.headerCarrierConfig, httpClientV2, NoRetries, new TestMetrics)
+      val hc = HeaderCarrier()
+      val connector = new EISConnectorImpl("Failure Test", connectorConfig, TestHelpers.headerCarrierConfig, httpClientV2, NoRetries, new TestMetrics) {
+        override protected val logger: Logger = loggerMock
 
-      when(httpClientV2.post(ArgumentMatchers.any[URL])(ArgumentMatchers.any[HeaderCarrier])).thenReturn(new FakeRequestBuilder)
+        override def retryLogging(response: Either[ConnectorError, _], retryDetails: RetryDetails): Unit = ()
+      }
+
+      when(httpClientV2.post(any[URL])(any[HeaderCarrier])).thenReturn(new FakeRequestBuilder)
 
       whenReady(connector.postAccessCodeRequest(GuaranteeReferenceNumber("abc"), hc).value) {
-        case Left(x) if x.isInstanceOf[ConnectorError.Unexpected] => x.asInstanceOf[ConnectorError.Unexpected].cause.get mustBe a[RuntimeException]
-        case _                                                    => fail("Left was not a RoutingError.Unexpected")
+        case Left(x: ConnectorError.Unexpected) =>
+          verify(loggerMock, times(1)).error(anyString())(any())
+          x.cause.get mustBe a[RuntimeException]
+        case _ => fail("Left was not a RoutingError.Unexpected")
       }
     }
   }
@@ -322,7 +365,7 @@ class EISConnectorSpec
         val hc = HeaderCarrier()
 
         whenReady(connector().postBalanceRequest(grn, hc).value) {
-          case Right(_) => succeed
+          case Right(_) => verify(loggerMock, times(0)).error(anyString())(any())
           case Left(ex) => fail(s"Failed with ${ex.toString}")
         }
     }
@@ -354,7 +397,7 @@ class EISConnectorSpec
       val hc = HeaderCarrier()
 
       whenReady(oneRetryConnector.postBalanceRequest(GuaranteeReferenceNumber("abc"), hc).value) {
-        case Right(_) => succeed
+        case Right(_) => verify(loggerMock, times(1)).error(anyString())(any())
         case Left(ex) => fail(s"Failed with ${ex.toString}")
       }
     }
@@ -366,27 +409,27 @@ class EISConnectorSpec
       GATEWAY_TIMEOUT
     ).foreach {
       statusCode =>
-        s"pass through error status code $statusCode" in forAll(connectorGen) {
-          connector =>
-            server.resetAll() // Need to reset due to the forAll - it's technically the same test
+        s"pass through error status code $statusCode" in {
+          server.resetAll() // Need to reset due to the forAll - it's technically the same test
 
-            server.stubFor(
-              post(
-                urlEqualTo(balanceUri)
-              ).withHeader("Authorization", equalTo("Bearer bearertokenhereGB"))
-                .withHeader(HeaderNames.ACCEPT, equalTo("application/json"))
-                .withHeader("X-Correlation-Id", matching(RegexPatterns.UUID))
-                .willReturn(aResponse().withStatus(statusCode))
-            )
+          server.stubFor(
+            post(
+              urlEqualTo(balanceUri)
+            ).withHeader("Authorization", equalTo("Bearer bearertokenhereGB"))
+              .withHeader(HeaderNames.ACCEPT, equalTo("application/json"))
+              .withHeader("X-Correlation-Id", matching(RegexPatterns.UUID))
+              .willReturn(aResponse().withStatus(statusCode))
+          )
 
-            val hc = HeaderCarrier()
+          val hc = HeaderCarrier()
 
-            whenReady(connector().postBalanceRequest(GuaranteeReferenceNumber("abc"), hc).value) {
-              case Left(x: ConnectorError.Upstream) =>
-                x.upstreamErrorResponse.statusCode mustBe statusCode
-              case x =>
-                fail(s"Left was not a RoutingError.Upstream (got $x)")
-            }
+          whenReady(noRetriesConnector.postBalanceRequest(GuaranteeReferenceNumber("abc"), hc).value) {
+            case Left(x: ConnectorError.Upstream) =>
+              verify(loggerMock, times(1)).error(anyString())(any())
+              x.upstreamErrorResponse.statusCode mustBe statusCode
+            case x =>
+              fail(s"Left was not a RoutingError.Upstream (got $x)")
+          }
         }
     }
 
@@ -396,7 +439,7 @@ class EISConnectorSpec
       val hc        = HeaderCarrier()
       val connector = new EISConnectorImpl("Failure", connectorConfig, TestHelpers.headerCarrierConfig, httpClientV2, NoRetries, new TestMetrics)
 
-      when(httpClientV2.post(ArgumentMatchers.any[URL])(ArgumentMatchers.any[HeaderCarrier])).thenReturn(new FakeRequestBuilder)
+      when(httpClientV2.post(any[URL])(any[HeaderCarrier])).thenReturn(new FakeRequestBuilder)
 
       whenReady(connector.postBalanceRequest(GuaranteeReferenceNumber("abc"), hc).value) {
         case Left(x) if x.isInstanceOf[ConnectorError.Unexpected] => x.asInstanceOf[ConnectorError.Unexpected].cause.get mustBe a[RuntimeException]
@@ -416,7 +459,7 @@ class EISConnectorSpec
     testCases foreach {
       entry =>
         s"always return unit for ${entry._1}" in {
-          noRetriesConnector.retryLogging(entry._2, RetryDetails.GivingUp(1, 20.seconds))
+          noRetriesConnectorWithRetryLogging.retryLogging(entry._2, RetryDetails.GivingUp(1, 20.seconds))
           succeed // i.e. an exception wasn't thrown
         }
     }
