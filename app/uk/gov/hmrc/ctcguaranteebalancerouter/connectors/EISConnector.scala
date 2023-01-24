@@ -108,6 +108,7 @@ class EISConnectorImpl(
     EitherT {
       protect(isFailure[A], isFailure[A], retryLogging) {
         val correlationId = UUID.randomUUID().toString
+        val requestId     = hc.requestId.getOrElse("unknown")
         val requestHeaders = hc.headers(Seq(HMRCHeaderNames.xRequestId)) ++ Seq(
           "X-Correlation-Id"        -> correlationId,
           "CustomProcessHost"       -> "Digital",
@@ -126,15 +127,26 @@ class EISConnectorImpl(
               case Right(httpResponse) =>
                 httpResponse.json.validate[A] match {
                   case JsSuccess(value, _) => Right(value)
-                  case JsError(_)          => Left(ConnectorError.FailedToDeserialise)
+                  case JsError(_) =>
+                    logger.error(
+                      s"Request Error: Routing to $code succeeded, but returned payload was malformed. Request ID: $requestId. Correlation ID: $correlationId."
+                    )
+                    Left(ConnectorError.FailedToDeserialise)
                 }
               // TODO: Improve once we know what EIS will do
-              case Left(UpstreamErrorResponse(_, statusCode, _, _)) if statusCode == BAD_REQUEST || statusCode == NOT_FOUND => Left(ConnectorError.NotFound)
-              case Left(upstreamErrorResponse)                                                                              => Left(ConnectorError.Upstream(upstreamErrorResponse))
+              case Left(UpstreamErrorResponse(_, statusCode, _, _)) if statusCode == BAD_REQUEST || statusCode == NOT_FOUND =>
+                Left(ConnectorError.NotFound)
+              case Left(upstreamErrorResponse) =>
+                logger.error(
+                  s"Request Error: Routing to $code failed to retrieve data with status code ${upstreamErrorResponse.statusCode} and message ${upstreamErrorResponse.message}. Request ID: $requestId. Correlation ID: $correlationId"
+                )
+                Left(ConnectorError.Upstream(upstreamErrorResponse))
             }
             .recover {
               case NonFatal(e) =>
-                logger.error(s"Request Error: Routing to $code failed to retrieve data with message ${e.getMessage}. Correlation ID: $correlationId.")
+                logger.error(
+                  s"Request Error: Routing to $code failed to retrieve data with message ${e.getMessage}. Request ID: $requestId. Correlation ID: $correlationId."
+                )
                 Left(ConnectorError.Unexpected("message", Some(e)))
             }
         }
@@ -155,7 +167,8 @@ class EISConnectorImpl(
       case _                                           => ()
     }
 
-  private def logAttemptedRetry(message: String, retryDetails: RetryDetails): Unit = {
+  // Visibility for testing
+  protected def logAttemptedRetry(message: String, retryDetails: RetryDetails): Unit = {
     val attemptNumber = retryDetails.retriesSoFar + 1
     if (retryDetails.givingUp) {
       logger.error(
