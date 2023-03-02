@@ -27,12 +27,17 @@ import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 import play.api.http.Status.INTERNAL_SERVER_ERROR
 import play.api.http.Status.OK
 import play.api.libs.json.Json
+import play.api.mvc.ActionBuilder
+import play.api.mvc.AnyContent
+import play.api.mvc.DefaultActionBuilder
+import play.api.mvc.Request
 import play.api.test.FakeHeaders
 import play.api.test.FakeRequest
 import play.api.test.Helpers.contentAsJson
 import play.api.test.Helpers.defaultAwaitTimeout
 import play.api.test.Helpers.status
 import play.api.test.Helpers.stubControllerComponents
+import uk.gov.hmrc.ctcguaranteebalancerouter.controllers.actions.InternalAuthActionProvider
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.AccessCode
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.Balance
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.CountryCode
@@ -43,12 +48,19 @@ import uk.gov.hmrc.ctcguaranteebalancerouter.services.AccessCodeService
 import uk.gov.hmrc.ctcguaranteebalancerouter.services.BalanceRetrievalService
 import uk.gov.hmrc.ctcguaranteebalancerouter.services.CountryExtractionService
 import uk.gov.hmrc.ctcguaranteebalancerouter.utils.Generators
+import uk.gov.hmrc.internalauth.client.Predicate
 
+import scala.concurrent.ExecutionContext
 import scala.concurrent.ExecutionContext.Implicits.global
 
 class BalanceControllerSpec extends AnyFreeSpec with Matchers with MockitoSugar with ScalaCheckDrivenPropertyChecks with Generators {
 
   "BalanceController#postBalance" - {
+
+    object PassthroughAuthProvider extends InternalAuthActionProvider {
+      override def apply(predicate: Predicate)(implicit ec: ExecutionContext): ActionBuilder[Request, AnyContent] =
+        DefaultActionBuilder(stubControllerComponents().parsers.anyContent)(ec)
+    }
 
     "valid GRN will return a balance" in forAll(
       arbitrary[GuaranteeReferenceNumber],
@@ -74,7 +86,7 @@ class BalanceControllerSpec extends AnyFreeSpec with Matchers with MockitoSugar 
         when(ces.extractCountry(GuaranteeReferenceNumber(eqTo(grn.value))))
           .thenReturn(EitherT.rightT(CountryCode.Gb))
 
-        val sut    = new BalanceController(acs, brs, ces, stubControllerComponents())
+        val sut    = new BalanceController(acs, brs, ces, stubControllerComponents(), PassthroughAuthProvider)
         val result = sut.postBalance(grn)(FakeRequest("POST", "/", FakeHeaders(), RouterBalanceRequest(accessCode)))
 
         status(result) mustBe OK
@@ -105,7 +117,7 @@ class BalanceControllerSpec extends AnyFreeSpec with Matchers with MockitoSugar 
         when(ces.extractCountry(GuaranteeReferenceNumber(eqTo(grn.value))))
           .thenReturn(EitherT.rightT(CountryCode.Gb))
 
-        val sut    = new BalanceController(acs, brs, ces, stubControllerComponents())
+        val sut    = new BalanceController(acs, brs, ces, stubControllerComponents(), PassthroughAuthProvider)
         val result = sut.postBalance(grn)(FakeRequest("POST", "/", FakeHeaders(), RouterBalanceRequest(accessCode)))
 
         status(result) mustBe INTERNAL_SERVER_ERROR
