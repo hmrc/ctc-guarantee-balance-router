@@ -19,12 +19,18 @@ package uk.gov.hmrc.ctcguaranteebalancerouter.controllers
 import play.api.libs.json.Json
 import play.api.mvc.Action
 import play.api.mvc.ControllerComponents
+import uk.gov.hmrc.ctcguaranteebalancerouter.controllers.actions.InternalAuthActionProvider
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.GuaranteeReferenceNumber
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.RouterBalanceRequest
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.RouterBalanceResponse
 import uk.gov.hmrc.ctcguaranteebalancerouter.services.AccessCodeService
 import uk.gov.hmrc.ctcguaranteebalancerouter.services.BalanceRetrievalService
 import uk.gov.hmrc.ctcguaranteebalancerouter.services.CountryExtractionService
+import uk.gov.hmrc.internalauth.client.IAAction
+import uk.gov.hmrc.internalauth.client.Predicate
+import uk.gov.hmrc.internalauth.client.Resource
+import uk.gov.hmrc.internalauth.client.ResourceLocation
+import uk.gov.hmrc.internalauth.client.ResourceType
 import uk.gov.hmrc.play.bootstrap.backend.controller.BackendController
 
 import javax.inject.Inject
@@ -36,20 +42,24 @@ class BalanceController @Inject() (
   accessCodeService: AccessCodeService,
   balanceRetrievalService: BalanceRetrievalService,
   countryExtractionService: CountryExtractionService,
-  cc: ControllerComponents
+  cc: ControllerComponents,
+  auth: InternalAuthActionProvider
 )(implicit ec: ExecutionContext)
     extends BackendController(cc)
     with ErrorTranslator {
 
-  def postBalance(grn: GuaranteeReferenceNumber): Action[RouterBalanceRequest] = Action.async[RouterBalanceRequest](parse.json[RouterBalanceRequest]) {
-    implicit request =>
-      (for {
-        country <- countryExtractionService.extractCountry(grn).asPresentation
-        _       <- accessCodeService.ensureAccessCodeValid(grn, request.body.accessCode, country).asPresentation
-        balance <- balanceRetrievalService.getBalance(grn, country).asPresentation
-      } yield balance).fold(
-        presentationError => Status(presentationError.code.statusCode)(Json.toJson(presentationError)),
-        balance => Ok(Json.toJson(RouterBalanceResponse(balance)))
-      )
-  }
+  private val endpointPermission = Predicate.Permission(Resource(ResourceType("ctc-guarantee-balance-router"), ResourceLocation("balance")), IAAction("READ"))
+
+  def postBalance(grn: GuaranteeReferenceNumber): Action[RouterBalanceRequest] =
+    auth(endpointPermission).async[RouterBalanceRequest](parse.json[RouterBalanceRequest]) {
+      implicit request =>
+        (for {
+          country <- countryExtractionService.extractCountry(grn).asPresentation
+          _       <- accessCodeService.ensureAccessCodeValid(grn, request.body.accessCode, country).asPresentation
+          balance <- balanceRetrievalService.getBalance(grn, country).asPresentation
+        } yield balance).fold(
+          presentationError => Status(presentationError.code.statusCode)(Json.toJson(presentationError)),
+          balance => Ok(Json.toJson(RouterBalanceResponse(balance)))
+        )
+    }
 }

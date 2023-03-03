@@ -10,11 +10,12 @@ object AppDependencies {
   private val bootstrapVersion = "7.12.0"
 
   val compile = Seq(
-    "uk.gov.hmrc"      %% "bootstrap-backend-play-28"  % bootstrapVersion,
-    "io.lemonlabs"     %% "scala-uri"                  % "3.6.0",
-    "org.typelevel"    %% "cats-core"                  % catsVersion,
-    "com.github.cb372" %% "cats-retry"                 % catsRetryVersion,
-    "com.github.cb372" %% "alleycats-retry"            % catsRetryVersion
+    "uk.gov.hmrc"      %% "bootstrap-backend-play-28"    % bootstrapVersion,
+    "io.lemonlabs"     %% "scala-uri"                    % "3.6.0",
+    "org.typelevel"    %% "cats-core"                    % catsVersion,
+    "com.github.cb372" %% "cats-retry"                   % catsRetryVersion,
+    "com.github.cb372" %% "alleycats-retry"              % catsRetryVersion,
+    "uk.gov.hmrc"      %% "internal-auth-client-play-28" % "1.4.0"
   )
 
   val test = Seq(

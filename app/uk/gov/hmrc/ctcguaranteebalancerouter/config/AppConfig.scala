@@ -29,4 +29,6 @@ class AppConfig @Inject() (config: Configuration) {
 
   lazy val eisGbConfig: EISInstanceConfig = config.get[EISInstanceConfig]("microservice.services.eis.gb")
   lazy val eisXiConfig: EISInstanceConfig = config.get[EISInstanceConfig]("microservice.services.eis.xi")
+
+  lazy val internalAuthEnabled: Boolean = config.get[Boolean]("microservice.services.internal-auth.enabled")
 }
