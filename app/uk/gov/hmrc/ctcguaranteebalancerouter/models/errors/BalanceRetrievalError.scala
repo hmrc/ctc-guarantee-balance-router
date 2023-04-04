@@ -19,6 +19,7 @@ package uk.gov.hmrc.ctcguaranteebalancerouter.models.errors
 sealed trait BalanceRetrievalError
 
 object BalanceRetrievalError {
+  case object GrnNotFound         extends BalanceRetrievalError
   case object FailedToDeserialise extends BalanceRetrievalError
 
   case class Unexpected(message: String, thr: Option[Throwable]) extends BalanceRetrievalError

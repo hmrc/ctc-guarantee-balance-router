@@ -74,6 +74,10 @@ class ErrorTranslatorSpec extends AnyFreeSpec with Matchers with OptionValues wi
       balanceRetrievalErrorConveter.convert(BalanceRetrievalError.FailedToDeserialise) mustBe PresentationError.internalServiceError()
     }
 
+    "NotFound is a not found" in {
+      balanceRetrievalErrorConveter.convert(BalanceRetrievalError.GrnNotFound) mustBe PresentationError.notFoundError("GRN not found")
+    }
+
     "Unexpected Error with no exception is an Internal Service Error" in {
       balanceRetrievalErrorConveter.convert(BalanceRetrievalError.Unexpected("bleh", None)) mustBe PresentationError.internalServiceError()
     }
@@ -85,9 +89,6 @@ class ErrorTranslatorSpec extends AnyFreeSpec with Matchers with OptionValues wi
   }
 
   "AccessCodeError error" - {
-    "NotFound is a not found" in {
-      accessCodeErrorConverter.convert(AccessCodeError.NotFound) mustBe PresentationError.notFoundError("GRN not found")
-    }
 
     "InvalidAccessCode is a forbidden" in {
       accessCodeErrorConverter.convert(AccessCodeError.InvalidAccessCode) mustBe PresentationError.forbiddenError("Access code did not match")

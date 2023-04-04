@@ -45,13 +45,12 @@ class BalanceRetrievalServiceImpl @Inject() (connectorProvider: EISConnectorProv
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): EitherT[Future, BalanceRetrievalError, Balance] =
-    connectorProvider(countryCode).postBalanceRequest(grn, hc).map(_.remainingBalance).leftMap(handleConnectorError)
+    connectorProvider(countryCode).getBalanceRequest(grn, hc).map(_.balance).leftMap(handleConnectorError)
 
   private def handleConnectorError(error: ConnectorError): BalanceRetrievalError = error match {
-    case ConnectorError.Upstream(err)            => BalanceRetrievalError.Unexpected("Upstream Error", Some(err))
     case ConnectorError.Unexpected(message, err) => BalanceRetrievalError.Unexpected(message, err)
     case ConnectorError.FailedToDeserialise      => BalanceRetrievalError.FailedToDeserialise
-    case ConnectorError.NotFound                 => BalanceRetrievalError.Unexpected("GRN Not Found", None)
+    case ConnectorError.GrnNotFound              => BalanceRetrievalError.GrnNotFound
   }
 
 }

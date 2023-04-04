@@ -42,7 +42,6 @@ trait ErrorTranslator {
     override def convert(error: AccessCodeError): PresentationError = error match {
       case AccessCodeError.InvalidAccessCode   => PresentationError.forbiddenError("Access code did not match")
       case AccessCodeError.FailedToDeserialise => PresentationError.internalServiceError()
-      case AccessCodeError.NotFound            => PresentationError.notFoundError("GRN not found")
       case AccessCodeError.Unexpected(_, _)    => PresentationError.internalServiceError()
     }
   }
@@ -50,6 +49,7 @@ trait ErrorTranslator {
   implicit val balanceRetrievalErrorConveter = new Converter[BalanceRetrievalError] {
 
     override def convert(input: BalanceRetrievalError): PresentationError = input match {
+      case BalanceRetrievalError.GrnNotFound         => PresentationError.notFoundError("GRN not found")
       case BalanceRetrievalError.FailedToDeserialise => PresentationError.internalServiceError()
       case BalanceRetrievalError.Unexpected(_, _)    => PresentationError.internalServiceError()
     }

@@ -14,12 +14,17 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.ctcguaranteebalancerouter.models
+package uk.gov.hmrc.ctcguaranteebalancerouter.models.responses
 
 import play.api.libs.json.Json
 
-object AccessCodeResponse {
-  implicit val accessCodeResponseFormat = Json.format[AccessCodeResponse]
+import java.time.OffsetDateTime
+
+case class EISResponse(message: String, timestamp: OffsetDateTime, path: String) {
+  def invalidAccessCode  = message == "Not Valid Access Code for this operation"
+  def containsInvalidGRN = message.contains("Guarantee not found for GRN")
 }
 
-case class AccessCodeResponse(GRN: GuaranteeReferenceNumber, accessCode: AccessCode)
+object EISResponse {
+  implicit val format = Json.format[EISResponse]
+}

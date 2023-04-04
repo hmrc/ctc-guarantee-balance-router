@@ -21,8 +21,9 @@ import play.api.mvc.Action
 import play.api.mvc.ControllerComponents
 import uk.gov.hmrc.ctcguaranteebalancerouter.controllers.actions.InternalAuthActionProvider
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.GuaranteeReferenceNumber
-import uk.gov.hmrc.ctcguaranteebalancerouter.models.RouterBalanceRequest
-import uk.gov.hmrc.ctcguaranteebalancerouter.models.RouterBalanceResponse
+import uk.gov.hmrc.ctcguaranteebalancerouter.models.responses
+import uk.gov.hmrc.ctcguaranteebalancerouter.models.requests.RouterBalanceRequest
+import uk.gov.hmrc.ctcguaranteebalancerouter.models.responses.RouterBalanceResponse
 import uk.gov.hmrc.ctcguaranteebalancerouter.services.AccessCodeService
 import uk.gov.hmrc.ctcguaranteebalancerouter.services.BalanceRetrievalService
 import uk.gov.hmrc.ctcguaranteebalancerouter.services.CountryExtractionService
@@ -59,7 +60,7 @@ class BalanceController @Inject() (
           balance <- balanceRetrievalService.getBalance(grn, country).asPresentation
         } yield balance).fold(
           presentationError => Status(presentationError.code.statusCode)(Json.toJson(presentationError)),
-          balance => Ok(Json.toJson(RouterBalanceResponse(balance)))
+          balance => Ok(Json.toJson(responses.RouterBalanceResponse(balance)))
         )
     }
 }

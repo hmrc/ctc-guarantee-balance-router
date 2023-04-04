@@ -51,9 +51,9 @@ import uk.gov.hmrc.ctcguaranteebalancerouter.itbase.TestActorSystem
 import uk.gov.hmrc.ctcguaranteebalancerouter.itbase.TestHelpers
 import uk.gov.hmrc.ctcguaranteebalancerouter.itbase.TestMetrics
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.AccessCode
-import uk.gov.hmrc.ctcguaranteebalancerouter.models.AccessCodeResponse
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.GuaranteeReferenceNumber
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.errors.ConnectorError
+import uk.gov.hmrc.ctcguaranteebalancerouter.models.responses.AccessCodeResponse
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.http.HttpResponse
 import uk.gov.hmrc.http.UpstreamErrorResponse
@@ -61,6 +61,7 @@ import uk.gov.hmrc.http.client.HttpClientV2
 import uk.gov.hmrc.http.test.HttpClientV2Support
 
 import java.net.URL
+import java.time.OffsetDateTime
 import scala.concurrent.ExecutionContext
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -95,17 +96,13 @@ class EISConnectorSpec
       RetryPolicies.limitRetries[Future](1)(cats.implicits.catsStdInstancesForFuture(ec))
   }
 
-  val accessCodeUri = "/ctc-guarantee-balance-eis-stub/guarantee/accessCode"
-  val balanceUri    = "/ctc-guarantee-balance-eis-stub/guarantee/balance"
+  def accessCodeUri(grn: GuaranteeReferenceNumber) = s"/guarantees/${grn.value}/access-codes"
+  def balanceUri(grn: GuaranteeReferenceNumber)    = s"/guarantees/${grn.value}/balance"
 
   val connectorConfig: EISInstanceConfig = EISInstanceConfig(
     "http",
     "localhost",
     wiremockPort,
-    EISURIsConfig(
-      accessCodeUri,
-      balanceUri
-    ),
     Headers("bearertokenhereGB"),
     CircuitBreakerConfig(
       3,
@@ -163,6 +160,17 @@ class EISConnectorSpec
   override def afterEach(): Unit =
     reset(loggerMock)
 
+  def accessCodeResponseBody(grn: GuaranteeReferenceNumber) =
+    Json.stringify(Json.obj("grn" -> grn.value, "masterAccessCode" -> "ABCD", "additionalAccessCodes" -> Json.arr("AB34")))
+
+  val invalidAccessCodeResponseBody =
+    Json.stringify(Json.obj("message" -> "Not Valid Access Code for this operation", "timestamp" -> OffsetDateTime.now().toString, "path" -> "..."))
+
+  def grnNotFoundResponseBody(grn: GuaranteeReferenceNumber) =
+    Json.stringify(Json.obj("message" -> s"Guarantee not found for GRN: ${grn.value}", "timestamp" -> OffsetDateTime.now().toString, "path" -> "..."))
+
+  def balanceResponseBody(grn: GuaranteeReferenceNumber) = Json.stringify(Json.obj("grn" -> grn.value, "balance" -> 123.45, "currencyCL" -> "GBP"))
+
   "postAccessCodeRequest" should {
 
     "add CustomProcessHost and X-Correlation-Id headers to messages for GB and return a Right when successful" in forAll(
@@ -181,66 +189,71 @@ class EISConnectorSpec
         // If a 500 error is returned, this most likely means a retry happened, the first place to look
         // should be the code the determines if a result is successful.
 
-        def stub(currentState: String, targetState: String, codeToReturn: Int) =
+        def stub(currentState: String, targetState: String, codeToReturn: Int, body: String) =
           server.stubFor(
             post(
-              urlEqualTo(accessCodeUri)
+              urlEqualTo(accessCodeUri(grn))
             )
               .inScenario("Standard Call")
               .whenScenarioStateIs(currentState)
+              .withHeader("Authorization", equalTo("Bearer bearertokenhereGB"))
               .withHeader("X-Correlation-Id", matching(RegexPatterns.UUID))
               .withHeader("CustomProcessHost", equalTo("Digital"))
               .withHeader(HeaderNames.ACCEPT, equalTo("application/json"))
               .willReturn(
                 aResponse()
                   .withStatus(codeToReturn)
-                  .withBody(Json.stringify(Json.obj("GRN" -> grn.value, "accessCode" -> "ABCD")))
+                  .withBody(body)
               )
               .willSetStateTo(targetState)
           )
 
         val secondState = "should now fail"
 
-        stub(Scenario.STARTED, secondState, OK)
-        stub(secondState, secondState, INTERNAL_SERVER_ERROR)
+        stub(Scenario.STARTED, secondState, OK, accessCodeResponseBody(grn))
+        stub(secondState, secondState, INTERNAL_SERVER_ERROR, invalidAccessCodeResponseBody)
 
         val hc = HeaderCarrier()
 
         whenReady(connector().postAccessCodeRequest(grn, hc).value) {
-          case Right(AccessCodeResponse(_, AccessCode("ABCD"))) => verify(loggerMock, times(0)).error(anyString())(any())
-          case Right(x)                                         => fail(s"Got $x, which was not expected")
-          case Left(ex)                                         => fail(s"Failed with ${ex.toString}")
+          case Right(AccessCodeResponse(GuaranteeReferenceNumber(grn.value), AccessCode("ABCD"), List(AccessCode("AB34")))) =>
+            verify(loggerMock, times(0)).error(anyString())(any())
+          case Right(x) => fail(s"Got $x, which was not expected")
+          case Left(ex) => fail(s"Failed with ${ex.toString}")
         }
     }
 
     "return an AccessCodeResponse when post is successful on retry if there is an initial failure" in {
-      def stub(currentState: String, targetState: String, codeToReturn: Int) =
+      val grn = GuaranteeReferenceNumber("X1Y2")
+      def stub(currentState: String, targetState: String, codeToReturn: Int, body: String) =
         server.stubFor(
           post(
-            urlEqualTo(accessCodeUri)
+            urlEqualTo(accessCodeUri(grn))
           )
             .inScenario("Flaky Call")
             .whenScenarioStateIs(currentState)
             .willSetStateTo(targetState)
             .withHeader("Authorization", equalTo("Bearer bearertokenhereGB"))
-            .withHeader(HeaderNames.ACCEPT, equalTo("application/json"))
             .withHeader("X-Correlation-Id", matching(RegexPatterns.UUID))
+            .withHeader("CustomProcessHost", equalTo("Digital"))
+            .withHeader(HeaderNames.ACCEPT, equalTo("application/json"))
             .willReturn(
               aResponse()
                 .withStatus(codeToReturn)
-                .withBody(Json.stringify(Json.obj("GRN" -> "abc", "accessCode" -> "ABCD")))
+                .withBody(body)
             )
+            .willSetStateTo(targetState)
         )
 
       val secondState = "should now succeed"
 
-      stub(Scenario.STARTED, secondState, INTERNAL_SERVER_ERROR)
-      stub(secondState, secondState, OK)
+      stub(Scenario.STARTED, secondState, BAD_REQUEST, "error")
+      stub(secondState, secondState, OK, accessCodeResponseBody(grn))
 
       val hc = HeaderCarrier()
 
-      whenReady(oneRetryConnector.postAccessCodeRequest(GuaranteeReferenceNumber("abc"), hc).value) {
-        case Right(AccessCodeResponse(GuaranteeReferenceNumber("abc"), AccessCode("ABCD"))) =>
+      whenReady(oneRetryConnector.postAccessCodeRequest(grn, hc).value) {
+        case Right(AccessCodeResponse(GuaranteeReferenceNumber(grn.value), AccessCode("ABCD"), List(AccessCode("AB34")))) =>
           verify(loggerMock, times(1)).error(anyString())(any())
         case Right(x) =>
           fail(s"Got $x, which was not expected")
@@ -249,79 +262,81 @@ class EISConnectorSpec
       }
     }
 
-    // We're making a guess that EIS won't return a 404, but a 400 due to zero trust.
-    "a 400 error becomes not found" in forAll(connectorGen) {
+    // EIS always returns 500 status code if an error occurs
+    // we need to check the message in the response to derive the appropriate status code
+    "Invalid access code response from eis is correctly deserialised as ConnectorError.InvalidAccessCode" in forAll(
+      connectorGen
+    ) {
       connector =>
+        afterEach()
+        val grn = GuaranteeReferenceNumber("abc")
         server.resetAll() // Need to reset due to the forAll - it's technically the same test
 
         server.stubFor(
           post(
-            urlEqualTo(accessCodeUri)
+            urlEqualTo(accessCodeUri(grn))
           ).withHeader("Authorization", equalTo("Bearer bearertokenhereGB"))
             .withHeader(HeaderNames.ACCEPT, equalTo("application/json"))
             .withHeader("X-Correlation-Id", matching(RegexPatterns.UUID))
-            .willReturn(aResponse().withStatus(BAD_REQUEST))
+            .willReturn(aResponse().withStatus(INTERNAL_SERVER_ERROR).withBody(invalidAccessCodeResponseBody))
         )
 
         val hc = HeaderCarrier()
 
-        whenReady(connector().postAccessCodeRequest(GuaranteeReferenceNumber("abc"), hc).value) {
-          case Left(ConnectorError.NotFound) => verify(loggerMock, times(0)).error(anyString())(any())
-          case x                             => fail(s"Left was not a RoutingError.NotFound (got $x)")
+        whenReady(connector().postAccessCodeRequest(grn, hc).value) {
+          case Left(ConnectorError.InvalidAccessCode) => verify(loggerMock, times(1)).error(anyString())(any())
+          case x                                      => fail(s"Left was not a ConnectorError.InvalidAccessCode (got $x)")
         }
     }
 
-    Seq(
-      INTERNAL_SERVER_ERROR,
-      GATEWAY_TIMEOUT
-    ).foreach {
-      statusCode =>
-        s"pass through error status code $statusCode" in {
-          server.resetAll() // Need to reset due to the forAll - it's technically the same test
+    "Grn not found response from eis is correctly deserialised as ConnectorError.GrnNotFound" in forAll(
+      connectorGen
+    ) {
+      connector =>
+        afterEach()
+        val grn = GuaranteeReferenceNumber("abc")
+        server.resetAll() // Need to reset due to the forAll - it's technically the same test
 
-          server.stubFor(
-            post(
-              urlEqualTo(accessCodeUri)
-            ).withHeader("Authorization", equalTo("Bearer bearertokenhereGB"))
-              .withHeader(HeaderNames.ACCEPT, equalTo("application/json"))
-              .withHeader("X-Correlation-Id", matching(RegexPatterns.UUID))
-              .willReturn(aResponse().withStatus(statusCode))
-          )
+        server.stubFor(
+          post(
+            urlEqualTo(accessCodeUri(grn))
+          ).withHeader("Authorization", equalTo("Bearer bearertokenhereGB"))
+            .withHeader(HeaderNames.ACCEPT, equalTo("application/json"))
+            .withHeader("X-Correlation-Id", matching(RegexPatterns.UUID))
+            .willReturn(aResponse().withStatus(INTERNAL_SERVER_ERROR).withBody(grnNotFoundResponseBody(grn)))
+        )
 
-          val hc = HeaderCarrier()
+        val hc = HeaderCarrier()
 
-          whenReady(errorTestConnector.postAccessCodeRequest(GuaranteeReferenceNumber("abc"), hc).value) {
-            case Left(x: ConnectorError.Upstream) =>
-              verify(loggerMock, times(1)).error(anyString())(any())
-              x.upstreamErrorResponse.statusCode mustBe statusCode
-            case x =>
-              fail(s"Left was not a RoutingError.Upstream (got $x)")
-          }
+        whenReady(connector().postAccessCodeRequest(grn, hc).value) {
+          case Left(ConnectorError.GrnNotFound) => verify(loggerMock, times(1)).error(anyString())(any())
+          case x                                => fail(s"Left was not a ConnectorError.GrnNotFound (got $x)")
         }
     }
 
-    "handle exceptions by returning an HttpResponse with status code 500" in {
-      val httpClientV2 = mock[HttpClientV2]
+  }
 
-      val hc = HeaderCarrier()
-      val connector = new EISConnectorImpl("Failure Test", connectorConfig, TestHelpers.headerCarrierConfig, httpClientV2, NoRetries, new TestMetrics) {
-        override protected val logger: Logger = loggerMock
+  "handle exceptions by returning an HttpResponse with status code 500" in {
+    val httpClientV2 = mock[HttpClientV2]
 
-        override def retryLogging(response: Either[ConnectorError, _], retryDetails: RetryDetails): Unit = ()
-      }
+    val hc = HeaderCarrier()
+    val connector = new EISConnectorImpl("Failure Test", connectorConfig, TestHelpers.headerCarrierConfig, httpClientV2, NoRetries, new TestMetrics) {
+      override protected val logger: Logger = loggerMock
 
-      when(httpClientV2.post(any[URL])(any[HeaderCarrier])).thenReturn(new FakeRequestBuilder)
+      override def retryLogging(response: Either[ConnectorError, _], retryDetails: RetryDetails): Unit = ()
+    }
 
-      whenReady(connector.postAccessCodeRequest(GuaranteeReferenceNumber("abc"), hc).value) {
-        case Left(x: ConnectorError.Unexpected) =>
-          verify(loggerMock, times(1)).error(anyString())(any())
-          x.cause.get mustBe a[RuntimeException]
-        case _ => fail("Left was not a RoutingError.Unexpected")
-      }
+    when(httpClientV2.post(any[URL])(any[HeaderCarrier])).thenReturn(new FakeRequestBuilder)
+
+    whenReady(connector.postAccessCodeRequest(GuaranteeReferenceNumber("abc"), hc).value) {
+      case Left(x: ConnectorError.Unexpected) =>
+        verify(loggerMock, times(1)).error(anyString())(any())
+        x.cause.get mustBe a[RuntimeException]
+      case _ => fail("Left was not a RoutingError.Unexpected")
     }
   }
 
-  "postBalanceRequest" should {
+  "getBalanceRequest" should {
 
     "add CustomProcessHost and X-Correlation-Id headers to messages for GB and return a Right when successful" in forAll(
       connectorGen,
@@ -339,10 +354,10 @@ class EISConnectorSpec
         // If a 500 error is returned, this most likely means a retry happened, the first place to look
         // should be the code the determines if a result is successful.
 
-        def stub(currentState: String, targetState: String, codeToReturn: Int) =
+        def stub(currentState: String, targetState: String, codeToReturn: Int, body: String) =
           server.stubFor(
-            post(
-              urlEqualTo(balanceUri)
+            get(
+              urlEqualTo(balanceUri(grn))
             )
               .inScenario("Standard Call")
               .whenScenarioStateIs(currentState)
@@ -352,29 +367,32 @@ class EISConnectorSpec
               .willReturn(
                 aResponse()
                   .withStatus(codeToReturn)
-                  .withBody(Json.stringify(Json.obj("GRN" -> grn.value, "remainingBalance" -> 123.45)))
+                  .withBody(body)
               )
               .willSetStateTo(targetState)
           )
 
         val secondState = "should now fail"
 
-        stub(Scenario.STARTED, secondState, OK)
-        stub(secondState, secondState, INTERNAL_SERVER_ERROR)
+        stub(Scenario.STARTED, secondState, OK, balanceResponseBody(grn))
+        stub(secondState, secondState, INTERNAL_SERVER_ERROR, grnNotFoundResponseBody(grn))
 
         val hc = HeaderCarrier()
 
-        whenReady(connector().postBalanceRequest(grn, hc).value) {
+        whenReady(connector().getBalanceRequest(grn, hc).value) {
           case Right(_) => verify(loggerMock, times(0)).error(anyString())(any())
           case Left(ex) => fail(s"Failed with ${ex.toString}")
         }
     }
 
     "return BalanceResponse when post is successful on retry if there is an initial failure" in {
-      def stub(currentState: String, targetState: String, codeToReturn: Int) =
+      val grn = GuaranteeReferenceNumber("abc")
+      server.resetAll() // Need to reset due to the forAll - it's technically the same test
+
+      def stub(currentState: String, targetState: String, codeToReturn: Int, body: String) =
         server.stubFor(
-          post(
-            urlEqualTo(balanceUri)
+          get(
+            urlEqualTo(balanceUri(grn))
           )
             .inScenario("Flaky Call")
             .whenScenarioStateIs(currentState)
@@ -385,52 +403,48 @@ class EISConnectorSpec
             .willReturn(
               aResponse()
                 .withStatus(codeToReturn)
-                .withBody(Json.stringify(Json.obj("GRN" -> "abc", "remainingBalance" -> 1234.56)))
+                .withBody(body)
             )
         )
 
       val secondState = "should now succeed"
 
-      stub(Scenario.STARTED, secondState, INTERNAL_SERVER_ERROR)
-      stub(secondState, secondState, OK)
+      stub(Scenario.STARTED, secondState, BAD_REQUEST, "error")
+      stub(secondState, secondState, OK, balanceResponseBody(grn))
 
       val hc = HeaderCarrier()
 
-      whenReady(oneRetryConnector.postBalanceRequest(GuaranteeReferenceNumber("abc"), hc).value) {
+      whenReady(oneRetryConnector.getBalanceRequest(grn, hc).value) {
         case Right(_) => verify(loggerMock, times(1)).error(anyString())(any())
         case Left(ex) => fail(s"Failed with ${ex.toString}")
       }
     }
 
-    Seq(
-      FORBIDDEN,
-      INTERNAL_SERVER_ERROR,
-      BAD_GATEWAY,
-      GATEWAY_TIMEOUT
-    ).foreach {
-      statusCode =>
-        s"pass through error status code $statusCode" in {
-          server.resetAll() // Need to reset due to the forAll - it's technically the same test
+    "correctly derives not found status code from message for grn which cannot be found" in {
+      val grn = GuaranteeReferenceNumber("abc")
+      server.resetAll() // Need to reset due to the forAll - it's technically the same test
 
-          server.stubFor(
-            post(
-              urlEqualTo(balanceUri)
-            ).withHeader("Authorization", equalTo("Bearer bearertokenhereGB"))
-              .withHeader(HeaderNames.ACCEPT, equalTo("application/json"))
-              .withHeader("X-Correlation-Id", matching(RegexPatterns.UUID))
-              .willReturn(aResponse().withStatus(statusCode))
+      server.stubFor(
+        get(
+          urlEqualTo(balanceUri(grn))
+        ).withHeader("Authorization", equalTo("Bearer bearertokenhereGB"))
+          .withHeader(HeaderNames.ACCEPT, equalTo("application/json"))
+          .withHeader("X-Correlation-Id", matching(RegexPatterns.UUID))
+          .willReturn(
+            aResponse()
+              .withStatus(INTERNAL_SERVER_ERROR)
+              .withBody(grnNotFoundResponseBody(grn))
           )
+      )
 
-          val hc = HeaderCarrier()
+      val hc = HeaderCarrier()
 
-          whenReady(noRetriesConnector.postBalanceRequest(GuaranteeReferenceNumber("abc"), hc).value) {
-            case Left(x: ConnectorError.Upstream) =>
-              verify(loggerMock, times(1)).error(anyString())(any())
-              x.upstreamErrorResponse.statusCode mustBe statusCode
-            case x =>
-              fail(s"Left was not a RoutingError.Upstream (got $x)")
-          }
-        }
+      whenReady(noRetriesConnector.getBalanceRequest(grn, hc).value) {
+        case Left(x) if x == ConnectorError.GrnNotFound =>
+          verify(loggerMock, times(1)).error(anyString())(any())
+        case x =>
+          fail(s"Left was not a RoutingError.Upstream (got $x)")
+      }
     }
 
     "handle exceptions by returning an HttpResponse with status code 500" in {
@@ -439,9 +453,9 @@ class EISConnectorSpec
       val hc        = HeaderCarrier()
       val connector = new EISConnectorImpl("Failure", connectorConfig, TestHelpers.headerCarrierConfig, httpClientV2, NoRetries, new TestMetrics)
 
-      when(httpClientV2.post(any[URL])(any[HeaderCarrier])).thenReturn(new FakeRequestBuilder)
+      when(httpClientV2.get(any[URL])(any[HeaderCarrier])).thenReturn(new FakeRequestBuilder)
 
-      whenReady(connector.postBalanceRequest(GuaranteeReferenceNumber("abc"), hc).value) {
+      whenReady(connector.getBalanceRequest(GuaranteeReferenceNumber("abc"), hc).value) {
         case Left(x) if x.isInstanceOf[ConnectorError.Unexpected] => x.asInstanceOf[ConnectorError.Unexpected].cause.get mustBe a[RuntimeException]
         case _                                                    => fail("Left was not a RoutingError.Unexpected")
       }
@@ -451,9 +465,11 @@ class EISConnectorSpec
   "retryLogging" should {
 
     val testCases: Seq[(String, Either[ConnectorError, HttpResponse])] = Seq(
-      "Unexpected Error" -> Left(ConnectorError.Unexpected("bleh", None)),
-      "Upstream Error"   -> Left(ConnectorError.Upstream(UpstreamErrorResponse("bleh", INTERNAL_SERVER_ERROR))),
-      "Success"          -> Right(mock[HttpResponse])
+      "Unexpected Error"      -> Left(ConnectorError.Unexpected("bleh", None)),
+      "Invalid access code"   -> Left(ConnectorError.InvalidAccessCode),
+      "GRN not found"         -> Left(ConnectorError.GrnNotFound),
+      "Failed to deserialise" -> Left(ConnectorError.FailedToDeserialise),
+      "Success"               -> Right(mock[HttpResponse])
     )
 
     testCases foreach {

@@ -21,6 +21,5 @@ sealed trait AccessCodeError
 object AccessCodeError {
   case object InvalidAccessCode                                  extends AccessCodeError
   case object FailedToDeserialise                                extends AccessCodeError
-  case object NotFound                                           extends AccessCodeError
   case class Unexpected(message: String, thr: Option[Throwable]) extends AccessCodeError
 }

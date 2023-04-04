@@ -14,15 +14,14 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.ctcguaranteebalancerouter.models.errors
+package uk.gov.hmrc.ctcguaranteebalancerouter.models.responses
 
-sealed trait ConnectorError
+import play.api.libs.json.Json
+import uk.gov.hmrc.ctcguaranteebalancerouter.models.Balance
+import uk.gov.hmrc.ctcguaranteebalancerouter.models.GuaranteeReferenceNumber
 
-object ConnectorError {
-  case object FailedToDeserialise extends ConnectorError
-
-  case object GrnNotFound extends ConnectorError
-
-  case object InvalidAccessCode                                    extends ConnectorError
-  case class Unexpected(message: String, cause: Option[Throwable]) extends ConnectorError
+object BalanceResponse {
+  implicit val balanceResponseFormat = Json.format[BalanceResponse]
 }
+
+case class BalanceResponse(grn: GuaranteeReferenceNumber, balance: Balance, currencyCL: String)

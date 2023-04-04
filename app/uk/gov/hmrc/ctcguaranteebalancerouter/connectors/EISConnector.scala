@@ -22,23 +22,26 @@ import com.kenshoo.play.metrics.Metrics
 import play.api.Logging
 import play.api.http.HeaderNames
 import play.api.http.MimeTypes
-import play.api.http.Status.BAD_REQUEST
-import play.api.http.Status.NOT_FOUND
+import play.api.http.Status.INTERNAL_SERVER_ERROR
 import play.api.libs.json.JsError
 import play.api.libs.json.JsSuccess
 import play.api.libs.json.Json
 import play.api.libs.json.Reads
 import retry.RetryDetails
+import retry.retryingOnSomeErrors
 import uk.gov.hmrc.ctcguaranteebalancerouter.config.CircuitBreakerConfig
 import uk.gov.hmrc.ctcguaranteebalancerouter.config.EISInstanceConfig
 import uk.gov.hmrc.ctcguaranteebalancerouter.config.RetryConfig
 import uk.gov.hmrc.ctcguaranteebalancerouter.metrics.HasMetrics
 import uk.gov.hmrc.ctcguaranteebalancerouter.metrics.MetricsKeys
-import uk.gov.hmrc.ctcguaranteebalancerouter.models.AccessCodeResponse
-import uk.gov.hmrc.ctcguaranteebalancerouter.models.BalanceResponse
-import uk.gov.hmrc.ctcguaranteebalancerouter.models.GrnBasedRequest
+import uk.gov.hmrc.ctcguaranteebalancerouter.models.AccessCode
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.GuaranteeReferenceNumber
+import uk.gov.hmrc.ctcguaranteebalancerouter.models.requests
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.errors.ConnectorError
+import uk.gov.hmrc.ctcguaranteebalancerouter.models.requests.AccessCodeRequest
+import uk.gov.hmrc.ctcguaranteebalancerouter.models.responses.AccessCodeResponse
+import uk.gov.hmrc.ctcguaranteebalancerouter.models.responses.BalanceResponse
+import uk.gov.hmrc.ctcguaranteebalancerouter.models.responses.EISResponse
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.http.HttpReads.Implicits._
 import uk.gov.hmrc.http.HttpResponse
@@ -49,6 +52,7 @@ import uk.gov.hmrc.http.client.RequestBuilder
 import uk.gov.hmrc.http.{HeaderNames => HMRCHeaderNames}
 
 import java.util.UUID
+import java.util.regex.Pattern
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import scala.util.control.NonFatal
@@ -59,7 +63,7 @@ trait EISConnector {
     ec: ExecutionContext
   ): EitherT[Future, ConnectorError, AccessCodeResponse]
 
-  def postBalanceRequest(grn: GuaranteeReferenceNumber, hc: HeaderCarrier)(implicit ec: ExecutionContext): EitherT[Future, ConnectorError, BalanceResponse]
+  def getBalanceRequest(grn: GuaranteeReferenceNumber, hc: HeaderCarrier)(implicit ec: ExecutionContext): EitherT[Future, ConnectorError, BalanceResponse]
 
 }
 
@@ -82,24 +86,28 @@ class EISConnectorImpl(
 
   override def postAccessCodeRequest(grn: GuaranteeReferenceNumber, hc: HeaderCarrier)(implicit
     ec: ExecutionContext
-  ): EitherT[Future, ConnectorError, AccessCodeResponse] =
+  ): EitherT[Future, ConnectorError, AccessCodeResponse] = {
+    val url = s"${eisInstanceConfig.eisUrl}/guarantees/${grn.value}/access-codes"
     post(hc, MetricsKeys.eisAccessCodeEndpoint) {
-      createRequest(grn, eisInstanceConfig.accessCodeUrl)
+      headerCarrier =>
+        val body = Json.toJson(requests.AccessCodeRequest(AccessCode("AB12")))
+        httpClientV2
+          .post(url"$url")(headerCarrier)
+          .withBody(body)
+          .setHeader(headerCarrier.headersForUrl(headerCarrierConfig)(url): _*)
     }
+  }
 
-  override def postBalanceRequest(grn: GuaranteeReferenceNumber, hc: HeaderCarrier)(implicit
+  override def getBalanceRequest(grn: GuaranteeReferenceNumber, hc: HeaderCarrier)(implicit
     ec: ExecutionContext
-  ): EitherT[Future, ConnectorError, BalanceResponse] =
+  ): EitherT[Future, ConnectorError, BalanceResponse] = {
+    val url = s"${eisInstanceConfig.eisUrl}/guarantees/${grn.value}/balance"
     post(hc, MetricsKeys.eisGetBalanceEndpoint) {
-      createRequest(grn, eisInstanceConfig.balanceUrl)
+      headerCarrier =>
+        httpClientV2
+          .get(url"$url")(headerCarrier)
+          .setHeader(headerCarrier.headersForUrl(headerCarrierConfig)(url): _*)
     }
-
-  private def createRequest(grn: GuaranteeReferenceNumber, uri: String)(hc: HeaderCarrier)(implicit ec: ExecutionContext): RequestBuilder = {
-    val request = Json.toJson(GrnBasedRequest(grn))
-    httpClientV2
-      .post(url"$uri")(hc)
-      .withBody(request)
-      .setHeader(hc.headersForUrl(headerCarrierConfig)(uri): _*)
   }
 
   private def post[A](hc: HeaderCarrier, metricsKey: String)(
@@ -122,25 +130,38 @@ class EISConnectorImpl(
 
         withMetricsTimerResponse(metricsKey) {
           call(headerCarrier)
-            .execute[Either[UpstreamErrorResponse, HttpResponse]]
+            .execute[HttpResponse]
             .map[Either[ConnectorError, A]] {
-              case Right(httpResponse) =>
-                httpResponse.json.validate[A] match {
-                  case JsSuccess(value, _) => Right(value)
-                  case JsError(_) =>
+              response: HttpResponse =>
+                response.status match {
+                  case INTERNAL_SERVER_ERROR =>
                     logger.error(
-                      s"Request Error: Routing to $code succeeded, but returned payload was malformed. Request ID: $requestId. Correlation ID: $correlationId."
+                      s"Request Error: Routing to $code failed to retrieve data with status code ${response.status} and message ${response.body}. Request ID: $requestId. Correlation ID: $correlationId"
                     )
-                    Left(ConnectorError.FailedToDeserialise)
+
+                    response.json
+                      .validate[EISResponse]
+                      .asOpt
+                      .map(
+                        r => Left(deriveErrorFromResponseMessage(r))
+                      )
+                      .getOrElse(Left(ConnectorError.Unexpected("Failed to deserialize error response from EIS", None)))
+
+                  case success if success >= 200 & success < 300 =>
+                    response.json.validate[A] match {
+                      case JsSuccess(value, _) => Right(value)
+                      case JsError(_) =>
+                        logger.error(
+                          s"Request Error: Routing to $code succeeded, but returned payload was malformed. Request ID: $requestId. Correlation ID: $correlationId."
+                        )
+                        Left(ConnectorError.FailedToDeserialise)
+                    }
+                  case _ =>
+                    logger.error(
+                      s"Request Error: Routing to $code failed to retrieve data with status code ${response.status} and message ${response.body}. Request ID: $requestId. Correlation ID: $correlationId"
+                    )
+                    Left(ConnectorError.Unexpected("Unexpected response from EIS", None))
                 }
-              // TODO: Improve once we know what EIS will do
-              case Left(UpstreamErrorResponse(_, statusCode, _, _)) if statusCode == BAD_REQUEST || statusCode == NOT_FOUND =>
-                Left(ConnectorError.NotFound)
-              case Left(upstreamErrorResponse) =>
-                logger.error(
-                  s"Request Error: Routing to $code failed to retrieve data with status code ${upstreamErrorResponse.statusCode} and message ${upstreamErrorResponse.message}. Request ID: $requestId. Correlation ID: $correlationId"
-                )
-                Left(ConnectorError.Upstream(upstreamErrorResponse))
             }
             .recover {
               case NonFatal(e) =>
@@ -153,16 +174,27 @@ class EISConnectorImpl(
       }
     }
 
+  private def deriveErrorFromResponseMessage(response: EISResponse): ConnectorError =
+    (response.containsInvalidGRN, response.invalidAccessCode) match {
+      case (true, _) =>
+        ConnectorError.GrnNotFound
+      case (_, true) =>
+        ConnectorError.InvalidAccessCode
+      case _ => ConnectorError.Unexpected("Unexpected response from EIS", None)
+    }
+
   private def isFailure[A](either: Either[ConnectorError, A]): Boolean = either match {
-    case Right(_)                                                                                       => false
-    case Left(ConnectorError.Upstream(UpstreamErrorResponse(_, statusCode, _, _))) if statusCode <= 499 => false
-    case _                                                                                              => true
+    case Right(_)                                              => false
+    case Left(e) if !e.isInstanceOf[ConnectorError.Unexpected] => false
+    case _                                                     => true
   }
 
   def retryLogging(response: Either[ConnectorError, _], retryDetails: RetryDetails): Unit =
     response match {
-      case Left(ConnectorError.Upstream(upstreamErrorResponse)) =>
-        logAttemptedRetry(s"with status code ${upstreamErrorResponse.statusCode}", retryDetails)
+      case Left(ConnectorError.GrnNotFound) =>
+        logAttemptedRetry(s"with status code 404", retryDetails)
+      case Left(ConnectorError.InvalidAccessCode) =>
+        logAttemptedRetry(s"with status code 403", retryDetails)
       case Left(ConnectorError.Unexpected(message, _)) => logAttemptedRetry(s"with error $message", retryDetails)
       case _                                           => ()
     }

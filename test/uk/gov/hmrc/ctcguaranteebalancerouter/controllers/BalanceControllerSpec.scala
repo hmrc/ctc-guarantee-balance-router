@@ -47,8 +47,9 @@ import uk.gov.hmrc.ctcguaranteebalancerouter.models.AccessCode
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.Balance
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.CountryCode
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.GuaranteeReferenceNumber
-import uk.gov.hmrc.ctcguaranteebalancerouter.models.RouterBalanceRequest
+import uk.gov.hmrc.ctcguaranteebalancerouter.models.requests
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.errors.AccessCodeError
+import uk.gov.hmrc.ctcguaranteebalancerouter.models.requests.RouterBalanceRequest
 import uk.gov.hmrc.ctcguaranteebalancerouter.services.AccessCodeService
 import uk.gov.hmrc.ctcguaranteebalancerouter.services.BalanceRetrievalService
 import uk.gov.hmrc.ctcguaranteebalancerouter.services.CountryExtractionService
@@ -105,7 +106,7 @@ class BalanceControllerSpec extends AnyFreeSpec with Matchers with MockitoSugar 
             .thenReturn(EitherT.rightT(CountryCode.Gb))
 
           val sut    = new BalanceController(acs, brs, ces, stubControllerComponents(), PassthroughAuthProvider)
-          val result = sut.postBalance(grn)(FakeRequest("POST", "/", FakeHeaders(), RouterBalanceRequest(accessCode)))
+          val result = sut.postBalance(grn)(FakeRequest("POST", "/", FakeHeaders(), requests.RouterBalanceRequest(accessCode)))
 
           status(result) mustBe OK
           contentAsJson(result) mustBe Json.obj("balance" -> balance.value)
@@ -136,7 +137,7 @@ class BalanceControllerSpec extends AnyFreeSpec with Matchers with MockitoSugar 
             .thenReturn(EitherT.rightT(CountryCode.Gb))
 
           val sut    = new BalanceController(acs, brs, ces, stubControllerComponents(), PassthroughAuthProvider)
-          val result = sut.postBalance(grn)(FakeRequest("POST", "/", FakeHeaders(), RouterBalanceRequest(accessCode)))
+          val result = sut.postBalance(grn)(FakeRequest("POST", "/", FakeHeaders(), requests.RouterBalanceRequest(accessCode)))
 
           status(result) mustBe INTERNAL_SERVER_ERROR
       }
@@ -190,7 +191,7 @@ class BalanceControllerSpec extends AnyFreeSpec with Matchers with MockitoSugar 
 
         val sut = new BalanceController(acs, brs, ces, stubControllerComponents(), internalAuthActionProvider)
         val result =
-          sut.postBalance(grn)(FakeRequest("POST", "/", FakeHeaders(Seq(HeaderNames.AUTHORIZATION -> "Token 1234")), RouterBalanceRequest(accessCode)))
+          sut.postBalance(grn)(FakeRequest("POST", "/", FakeHeaders(Seq(HeaderNames.AUTHORIZATION -> "Token 1234")), requests.RouterBalanceRequest(accessCode)))
 
         status(result) mustBe OK
         contentAsJson(result) mustBe Json.obj("balance" -> balance.value)
