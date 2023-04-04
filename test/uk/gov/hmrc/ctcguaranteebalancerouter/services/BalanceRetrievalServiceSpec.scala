@@ -25,7 +25,6 @@ import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.time.SpanSugar.convertIntToGrainOfTime
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
-import play.api.http.Status.INTERNAL_SERVER_ERROR
 import uk.gov.hmrc.ctcguaranteebalancerouter.connectors.EISConnector
 import uk.gov.hmrc.ctcguaranteebalancerouter.fakes.connectors.FakeEISConnectorProvider
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.Balance
@@ -36,7 +35,6 @@ import uk.gov.hmrc.ctcguaranteebalancerouter.models.errors.ConnectorError
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.responses.BalanceResponse
 import uk.gov.hmrc.ctcguaranteebalancerouter.utils.Generators
 import uk.gov.hmrc.http.HeaderCarrier
-import uk.gov.hmrc.http.UpstreamErrorResponse
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -98,13 +96,13 @@ class BalanceRetrievalServiceSpec extends AnyFreeSpec with Matchers with ScalaCh
         }
     }
 
-    "on a not found, return a Left of BalanceRetrievalError.NotFound" in forAll(
+    "on a not found, return a Left of BalanceRetrievalError.BalanceRetrievalServiceSpec.scala" in forAll(
       arbitrary[GuaranteeReferenceNumber],
       arbitrary[CountryCode]
     ) {
       (grn, countryCode) =>
         val mockConnector = mock[EISConnector]
-        when(mockConnector.getBalanceRequest(GuaranteeReferenceNumber(any()), any())(any())).thenReturn(EitherT.leftT(ConnectorError.NotFound))
+        when(mockConnector.getBalanceRequest(GuaranteeReferenceNumber(any()), any())(any())).thenReturn(EitherT.leftT(ConnectorError.GrnNotFound))
 
         val sut = new BalanceRetrievalServiceImpl(FakeEISConnectorProvider(mockConnector, mockConnector))
 

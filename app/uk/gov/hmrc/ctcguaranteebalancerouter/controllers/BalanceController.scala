@@ -23,7 +23,6 @@ import uk.gov.hmrc.ctcguaranteebalancerouter.controllers.actions.InternalAuthAct
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.GuaranteeReferenceNumber
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.responses
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.requests.RouterBalanceRequest
-import uk.gov.hmrc.ctcguaranteebalancerouter.models.responses.RouterBalanceResponse
 import uk.gov.hmrc.ctcguaranteebalancerouter.services.AccessCodeService
 import uk.gov.hmrc.ctcguaranteebalancerouter.services.BalanceRetrievalService
 import uk.gov.hmrc.ctcguaranteebalancerouter.services.CountryExtractionService

@@ -20,7 +20,7 @@ import play.api.libs.json.Json
 
 import java.time.OffsetDateTime
 
-case class EISResponse(message: String, timestamp: OffsetDateTime, path: String) {
+case class EISResponse(message: String, timestamp: String, path: String) {
   def invalidAccessCode  = message == "Not Valid Access Code for this operation"
   def containsInvalidGRN = message.contains("Guarantee not found for GRN")
 }

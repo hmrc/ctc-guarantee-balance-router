@@ -28,7 +28,6 @@ import play.api.libs.json.JsSuccess
 import play.api.libs.json.Json
 import play.api.libs.json.Reads
 import retry.RetryDetails
-import retry.retryingOnSomeErrors
 import uk.gov.hmrc.ctcguaranteebalancerouter.config.CircuitBreakerConfig
 import uk.gov.hmrc.ctcguaranteebalancerouter.config.EISInstanceConfig
 import uk.gov.hmrc.ctcguaranteebalancerouter.config.RetryConfig
@@ -38,7 +37,6 @@ import uk.gov.hmrc.ctcguaranteebalancerouter.models.AccessCode
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.GuaranteeReferenceNumber
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.requests
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.errors.ConnectorError
-import uk.gov.hmrc.ctcguaranteebalancerouter.models.requests.AccessCodeRequest
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.responses.AccessCodeResponse
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.responses.BalanceResponse
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.responses.EISResponse
@@ -46,13 +44,11 @@ import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.http.HttpReads.Implicits._
 import uk.gov.hmrc.http.HttpResponse
 import uk.gov.hmrc.http.StringContextOps
-import uk.gov.hmrc.http.UpstreamErrorResponse
 import uk.gov.hmrc.http.client.HttpClientV2
 import uk.gov.hmrc.http.client.RequestBuilder
 import uk.gov.hmrc.http.{HeaderNames => HMRCHeaderNames}
 
 import java.util.UUID
-import java.util.regex.Pattern
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import scala.util.control.NonFatal
