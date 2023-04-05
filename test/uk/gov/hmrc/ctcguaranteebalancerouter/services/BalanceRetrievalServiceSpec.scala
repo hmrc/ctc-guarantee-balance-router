@@ -96,7 +96,7 @@ class BalanceRetrievalServiceSpec extends AnyFreeSpec with Matchers with ScalaCh
         }
     }
 
-    "on a not found, return a Left of BalanceRetrievalError.BalanceRetrievalServiceSpec.scala" in forAll(
+    "on a not found, return a Left of BalanceRetrievalError.GrnNotFound" in forAll(
       arbitrary[GuaranteeReferenceNumber],
       arbitrary[CountryCode]
     ) {
