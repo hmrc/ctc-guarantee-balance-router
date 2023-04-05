@@ -180,9 +180,9 @@ class EISConnectorImpl(
     }
 
   private def isFailure[A](either: Either[ConnectorError, A]): Boolean = either match {
+    case Right(_)                           => false
     case Left(_: ConnectorError.Unexpected) => true
     case Left(_)                            => false
-    case _                                  => true
   }
 
   def retryLogging(response: Either[ConnectorError, _], retryDetails: RetryDetails): Unit =
