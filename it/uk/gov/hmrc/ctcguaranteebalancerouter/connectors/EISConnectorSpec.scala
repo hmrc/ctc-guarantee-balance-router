@@ -101,7 +101,7 @@ class EISConnectorSpec
     "http",
     "localhost",
     wiremockPort,
-    "/ctc-guarantee-balance-router",
+    "/ctc-guarantee-balance-eis-stub",
     Headers("bearertokenhereGB"),
     CircuitBreakerConfig(
       3,
