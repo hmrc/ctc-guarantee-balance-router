@@ -59,7 +59,7 @@ class BalanceController @Inject() (
           balanceResponse <- balanceRetrievalService.getBalance(grn, request.body.accessCode, country).asPresentation
         } yield balanceResponse).fold(
           presentationError => Status(presentationError.code.statusCode)(Json.toJson(presentationError)),
-          balanceResponse => Ok(Json.toJson(responses.RouterBalanceResponse(balanceResponse.balance)))
+          balanceResponse => Ok(Json.toJson(responses.RouterBalanceResponse(balanceResponse.balance, balanceResponse.currencyCL)))
         )
     }
 }

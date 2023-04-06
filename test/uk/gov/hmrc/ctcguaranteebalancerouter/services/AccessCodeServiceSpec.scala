@@ -25,7 +25,6 @@ import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.time.SpanSugar.convertIntToGrainOfTime
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
-import play.api.http.Status.INTERNAL_SERVER_ERROR
 import uk.gov.hmrc.ctcguaranteebalancerouter.connectors.EISConnector
 import uk.gov.hmrc.ctcguaranteebalancerouter.fakes.connectors.FakeEISConnectorProvider
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.AccessCode
@@ -36,7 +35,6 @@ import uk.gov.hmrc.ctcguaranteebalancerouter.models.errors.ConnectorError
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.responses.AccessCodeResponse
 import uk.gov.hmrc.ctcguaranteebalancerouter.utils.Generators
 import uk.gov.hmrc.http.HeaderCarrier
-import uk.gov.hmrc.http.UpstreamErrorResponse
 
 import scala.concurrent.ExecutionContext.Implicits.global
 

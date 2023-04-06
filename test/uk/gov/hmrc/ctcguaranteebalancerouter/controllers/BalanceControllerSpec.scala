@@ -105,7 +105,7 @@ class BalanceControllerSpec extends AnyFreeSpec with Matchers with MockitoSugar 
           val result = sut.postBalance(grn)(FakeRequest("POST", "/", FakeHeaders(), requests.RouterBalanceRequest(accessCode)))
 
           status(result) mustBe OK
-          contentAsJson(result) mustBe Json.obj("balance" -> balanceResponse.balance.value)
+          contentAsJson(result) mustBe Json.obj("balance" -> balanceResponse.balance.value, "currencyCL" -> balanceResponse.currencyCL.value)
       }
 
       "backend failure will return a 500" in forAll(
@@ -190,7 +190,7 @@ class BalanceControllerSpec extends AnyFreeSpec with Matchers with MockitoSugar 
           sut.postBalance(grn)(FakeRequest("POST", "/", FakeHeaders(Seq(HeaderNames.AUTHORIZATION -> "Token 1234")), requests.RouterBalanceRequest(accessCode)))
 
         status(result) mustBe OK
-        contentAsJson(result) mustBe Json.obj("balance" -> balanceResponse.balance.value)
+        contentAsJson(result) mustBe Json.obj("balance" -> balanceResponse.balance.value, "currencyCL" -> balanceResponse.currencyCL.value)
 
     }
   }
