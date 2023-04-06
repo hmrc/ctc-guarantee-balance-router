@@ -18,7 +18,6 @@ package uk.gov.hmrc.ctcguaranteebalancerouter.models.responses
 
 import play.api.libs.json.Json
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.Balance
-import uk.gov.hmrc.ctcguaranteebalancerouter.models.CurrencyCL
 
 object RouterBalanceResponse {
   implicit val routerBalanceResponseFormat = Json.format[RouterBalanceResponse]

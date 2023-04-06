@@ -85,7 +85,7 @@ class EISConnectorImpl(
   override def postAccessCodeRequest(grn: GuaranteeReferenceNumber, accessCode: AccessCode, hc: HeaderCarrier)(implicit
     ec: ExecutionContext
   ): EitherT[Future, ConnectorError, AccessCodeResponse] = {
-    val url = s"${eisInstanceConfig.eisUrl}/ctc-guarantee-balance-eis-stub/guarantees/${grn.value}/access-codes"
+    val url = s"${eisInstanceConfig.eisUrl}/guarantees/${grn.value}/access-codes"
 
     post(hc, MetricsKeys.eisAccessCodeEndpoint) {
       headerCarrier =>
@@ -100,7 +100,7 @@ class EISConnectorImpl(
   override def getBalanceRequest(grn: GuaranteeReferenceNumber, hc: HeaderCarrier)(implicit
     ec: ExecutionContext
   ): EitherT[Future, ConnectorError, BalanceResponse] = {
-    val url = s"${eisInstanceConfig.eisUrl}/ctc-guarantee-balance-eis-stub/guarantees/${grn.value}/balance"
+    val url = s"${eisInstanceConfig.eisUrl}/guarantees/${grn.value}/balance"
     post(hc, MetricsKeys.eisGetBalanceEndpoint) {
       headerCarrier =>
         httpClientV2

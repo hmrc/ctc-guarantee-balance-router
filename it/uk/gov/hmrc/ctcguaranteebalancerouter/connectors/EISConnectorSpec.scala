@@ -94,13 +94,14 @@ class EISConnectorSpec
       RetryPolicies.limitRetries[Future](1)(cats.implicits.catsStdInstancesForFuture(ec))
   }
 
-  def accessCodeUri(grn: GuaranteeReferenceNumber) = s"/ctc-guarantee-balance-eis-stub/guarantees/${grn.value}/access-codes"
-  def balanceUri(grn: GuaranteeReferenceNumber)    = s"/ctc-guarantee-balance-eis-stub/guarantees/${grn.value}/balance"
+  def accessCodeUri(grn: GuaranteeReferenceNumber) = s"/ctc-guarantee-balance-router/guarantees/${grn.value}/access-codes"
+  def balanceUri(grn: GuaranteeReferenceNumber)    = s"/ctc-guarantee-balance-router/guarantees/${grn.value}/balance"
 
   val connectorConfig: EISInstanceConfig = EISInstanceConfig(
     "http",
     "localhost",
     wiremockPort,
+    "/ctc-guarantee-balance-router",
     Headers("bearertokenhereGB"),
     CircuitBreakerConfig(
       3,
