@@ -40,6 +40,7 @@ trait ErrorTranslator {
   implicit val accessCodeErrorConverter = new Converter[AccessCodeError] {
 
     override def convert(error: AccessCodeError): PresentationError = error match {
+      case AccessCodeError.GrnNotFound         => PresentationError.notFoundError("GRN not found")
       case AccessCodeError.InvalidAccessCode   => PresentationError.forbiddenError("Access code did not match")
       case AccessCodeError.FailedToDeserialise => PresentationError.internalServiceError()
       case AccessCodeError.Unexpected(_, _)    => PresentationError.internalServiceError()

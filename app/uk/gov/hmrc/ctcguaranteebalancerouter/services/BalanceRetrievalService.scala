@@ -20,11 +20,12 @@ import cats.data.EitherT
 import com.google.inject.ImplementedBy
 import com.google.inject.Inject
 import uk.gov.hmrc.ctcguaranteebalancerouter.connectors.EISConnectorProvider
-import uk.gov.hmrc.ctcguaranteebalancerouter.models.Balance
+import uk.gov.hmrc.ctcguaranteebalancerouter.models.AccessCode
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.CountryCode
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.GuaranteeReferenceNumber
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.errors.BalanceRetrievalError
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.errors.ConnectorError
+import uk.gov.hmrc.ctcguaranteebalancerouter.models.responses.BalanceResponse
 import uk.gov.hmrc.http.HeaderCarrier
 
 import scala.concurrent.ExecutionContext
@@ -33,19 +34,19 @@ import scala.concurrent.Future
 @ImplementedBy(classOf[BalanceRetrievalServiceImpl])
 trait BalanceRetrievalService {
 
-  def getBalance(grn: GuaranteeReferenceNumber, countryCode: CountryCode)(implicit
+  def getBalance(grn: GuaranteeReferenceNumber, accessCode: AccessCode, countryCode: CountryCode)(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
-  ): EitherT[Future, BalanceRetrievalError, Balance]
+  ): EitherT[Future, BalanceRetrievalError, BalanceResponse]
 }
 
 class BalanceRetrievalServiceImpl @Inject() (connectorProvider: EISConnectorProvider) extends BalanceRetrievalService {
 
-  override def getBalance(grn: GuaranteeReferenceNumber, countryCode: CountryCode)(implicit
+  override def getBalance(grn: GuaranteeReferenceNumber, accessCode: AccessCode, countryCode: CountryCode)(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
-  ): EitherT[Future, BalanceRetrievalError, Balance] =
-    connectorProvider(countryCode).getBalanceRequest(grn, hc).map(_.balance).leftMap(handleConnectorError)
+  ): EitherT[Future, BalanceRetrievalError, BalanceResponse] =
+    connectorProvider(countryCode).getBalanceRequest(grn, hc).leftMap(handleConnectorError)
 
   private def handleConnectorError(error: ConnectorError): BalanceRetrievalError = error match {
     case ConnectorError.Unexpected(message, err) => BalanceRetrievalError.Unexpected(message, err)

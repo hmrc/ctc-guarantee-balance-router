@@ -55,11 +55,13 @@ import scala.util.control.NonFatal
 
 trait EISConnector {
 
-  def postAccessCodeRequest(grn: GuaranteeReferenceNumber, hc: HeaderCarrier)(implicit
+  def postAccessCodeRequest(grn: GuaranteeReferenceNumber, accessCode: AccessCode, hc: HeaderCarrier)(implicit
     ec: ExecutionContext
   ): EitherT[Future, ConnectorError, AccessCodeResponse]
 
-  def getBalanceRequest(grn: GuaranteeReferenceNumber, hc: HeaderCarrier)(implicit ec: ExecutionContext): EitherT[Future, ConnectorError, BalanceResponse]
+  def getBalanceRequest(grn: GuaranteeReferenceNumber, hc: HeaderCarrier)(implicit
+    ec: ExecutionContext
+  ): EitherT[Future, ConnectorError, BalanceResponse]
 
 }
 
@@ -80,13 +82,14 @@ class EISConnectorImpl(
 
   override val circuitBreakerConfig: CircuitBreakerConfig = eisInstanceConfig.circuitBreaker
 
-  override def postAccessCodeRequest(grn: GuaranteeReferenceNumber, hc: HeaderCarrier)(implicit
+  override def postAccessCodeRequest(grn: GuaranteeReferenceNumber, accessCode: AccessCode, hc: HeaderCarrier)(implicit
     ec: ExecutionContext
   ): EitherT[Future, ConnectorError, AccessCodeResponse] = {
-    val url = s"${eisInstanceConfig.eisUrl}/guarantees/${grn.value}/access-codes"
+    val url = s"${eisInstanceConfig.eisUrl}/ctc-guarantee-balance-eis-stub/guarantees/${grn.value}/access-codes"
+
     post(hc, MetricsKeys.eisAccessCodeEndpoint) {
       headerCarrier =>
-        val body = Json.toJson(requests.AccessCodeRequest(AccessCode("AB12")))
+        val body = Json.toJson(requests.AccessCodeRequest(accessCode))
         httpClientV2
           .post(url"$url")(headerCarrier)
           .withBody(body)
@@ -97,7 +100,7 @@ class EISConnectorImpl(
   override def getBalanceRequest(grn: GuaranteeReferenceNumber, hc: HeaderCarrier)(implicit
     ec: ExecutionContext
   ): EitherT[Future, ConnectorError, BalanceResponse] = {
-    val url = s"${eisInstanceConfig.eisUrl}/guarantees/${grn.value}/balance"
+    val url = s"${eisInstanceConfig.eisUrl}/ctc-guarantee-balance-eis-stub/guarantees/${grn.value}/balance"
     post(hc, MetricsKeys.eisGetBalanceEndpoint) {
       headerCarrier =>
         httpClientV2

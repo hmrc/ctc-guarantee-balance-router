@@ -29,6 +29,7 @@ import uk.gov.hmrc.ctcguaranteebalancerouter.connectors.EISConnector
 import uk.gov.hmrc.ctcguaranteebalancerouter.fakes.connectors.FakeEISConnectorProvider
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.Balance
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.CountryCode
+import uk.gov.hmrc.ctcguaranteebalancerouter.models.CurrencyCL
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.GuaranteeReferenceNumber
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.errors.BalanceRetrievalError
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.errors.ConnectorError
@@ -48,42 +49,45 @@ class BalanceRetrievalServiceSpec extends AnyFreeSpec with Matchers with ScalaCh
 
     "on valid GRN, return a Right of the balance" in forAll(
       arbitrary[GuaranteeReferenceNumber],
-      arbitrary[Balance],
-      arbitrary[CountryCode]
+      arbitrary[BalanceResponse],
+      arbitrary[CountryCode],
+      arbitraryAccessCode.arbitrary
     ) {
-      (grn, balance, countryCode) =>
+      (grn, balanceResponse, countryCode, accessCode) =>
         val mockConnector = mock[EISConnector]
         when(mockConnector.getBalanceRequest(GuaranteeReferenceNumber(any()), any())(any()))
-          .thenReturn(EitherT.rightT(BalanceResponse(grn, balance, "GBP")))
+          .thenReturn(EitherT.rightT(balanceResponse))
 
         val sut = new BalanceRetrievalServiceImpl(FakeEISConnectorProvider(mockConnector, mockConnector))
 
-        whenReady(sut.getBalance(grn, countryCode).value, Timeout(1.second)) {
-          _ mustBe Right(balance)
+        whenReady(sut.getBalance(grn, accessCode, countryCode).value, Timeout(1.second)) {
+          _ mustBe Right(balanceResponse)
         }
     }
 
     "on invalid Json, return a Left of BalanceRetrievalError.InvalidJson" in forAll(
       arbitrary[GuaranteeReferenceNumber],
-      arbitrary[CountryCode]
+      arbitrary[CountryCode],
+      arbitraryAccessCode.arbitrary
     ) {
-      (grn, countryCode) =>
+      (grn, countryCode, accessCode) =>
         val mockConnector = mock[EISConnector]
         when(mockConnector.getBalanceRequest(GuaranteeReferenceNumber(any()), any())(any()))
           .thenReturn(EitherT.leftT(ConnectorError.FailedToDeserialise))
 
         val sut = new BalanceRetrievalServiceImpl(FakeEISConnectorProvider(mockConnector, mockConnector))
 
-        whenReady(sut.getBalance(grn, countryCode).value, Timeout(1.second)) {
+        whenReady(sut.getBalance(grn, accessCode, countryCode).value, Timeout(1.second)) {
           _ mustBe Left(BalanceRetrievalError.FailedToDeserialise)
         }
     }
 
     "on an unexpected error, return a Left of BalanceRetrievalError.Unexpected" in forAll(
       arbitrary[GuaranteeReferenceNumber],
-      arbitrary[CountryCode]
+      arbitrary[CountryCode],
+      arbitraryAccessCode.arbitrary
     ) {
-      (grn, countryCode) =>
+      (grn, countryCode, accessCode) =>
         val error         = new IllegalStateException()
         val mockConnector = mock[EISConnector]
         when(mockConnector.getBalanceRequest(GuaranteeReferenceNumber(any()), any())(any()))
@@ -91,22 +95,23 @@ class BalanceRetrievalServiceSpec extends AnyFreeSpec with Matchers with ScalaCh
 
         val sut = new BalanceRetrievalServiceImpl(FakeEISConnectorProvider(mockConnector, mockConnector))
 
-        whenReady(sut.getBalance(grn, countryCode).value, Timeout(1.second)) {
+        whenReady(sut.getBalance(grn, accessCode, countryCode).value, Timeout(1.second)) {
           _ mustBe Left(BalanceRetrievalError.Unexpected("nope", Some(error)))
         }
     }
 
     "on a not found, return a Left of BalanceRetrievalError.GrnNotFound" in forAll(
       arbitrary[GuaranteeReferenceNumber],
-      arbitrary[CountryCode]
+      arbitrary[CountryCode],
+      arbitraryAccessCode.arbitrary
     ) {
-      (grn, countryCode) =>
+      (grn, countryCode, accessCode) =>
         val mockConnector = mock[EISConnector]
         when(mockConnector.getBalanceRequest(GuaranteeReferenceNumber(any()), any())(any())).thenReturn(EitherT.leftT(ConnectorError.GrnNotFound))
 
         val sut = new BalanceRetrievalServiceImpl(FakeEISConnectorProvider(mockConnector, mockConnector))
 
-        whenReady(sut.getBalance(grn, countryCode).value, Timeout(1.second)) {
+        whenReady(sut.getBalance(grn, accessCode, countryCode).value, Timeout(1.second)) {
           _ mustBe Left(BalanceRetrievalError.GrnNotFound)
         }
     }

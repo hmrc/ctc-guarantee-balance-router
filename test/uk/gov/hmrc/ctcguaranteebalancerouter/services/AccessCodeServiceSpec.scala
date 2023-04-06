@@ -56,7 +56,7 @@ class AccessCodeServiceSpec extends AnyFreeSpec with Matchers with ScalaCheckDri
     ) {
       (grn, accessCode, accessCodeList, countryCode) =>
         val mockConnector = mock[EISConnector]
-        when(mockConnector.postAccessCodeRequest(GuaranteeReferenceNumber(any()), any())(any()))
+        when(mockConnector.postAccessCodeRequest(GuaranteeReferenceNumber(any()), AccessCode(any()), any())(any()))
           .thenReturn(EitherT.rightT(AccessCodeResponse(grn, accessCode, accessCodeList)))
 
         val sut = new AccessCodeServiceImpl(FakeEISConnectorProvider(mockConnector, mockConnector))
@@ -73,7 +73,7 @@ class AccessCodeServiceSpec extends AnyFreeSpec with Matchers with ScalaCheckDri
     ) {
       (grn, accessCode, countryCode) =>
         val mockConnector = mock[EISConnector]
-        when(mockConnector.postAccessCodeRequest(GuaranteeReferenceNumber(any()), any())(any()))
+        when(mockConnector.postAccessCodeRequest(GuaranteeReferenceNumber(any()), AccessCode(any()), any())(any()))
           .thenReturn(EitherT.leftT(ConnectorError.InvalidAccessCode))
 
         val sut = new AccessCodeServiceImpl(FakeEISConnectorProvider(mockConnector, mockConnector))
@@ -90,7 +90,7 @@ class AccessCodeServiceSpec extends AnyFreeSpec with Matchers with ScalaCheckDri
     ) {
       (grn, accessCode, countryCode) =>
         val mockConnector = mock[EISConnector]
-        when(mockConnector.postAccessCodeRequest(GuaranteeReferenceNumber(any()), any())(any()))
+        when(mockConnector.postAccessCodeRequest(GuaranteeReferenceNumber(any()), AccessCode(any()), any())(any()))
           .thenReturn(EitherT.leftT(ConnectorError.FailedToDeserialise))
 
         val sut = new AccessCodeServiceImpl(FakeEISConnectorProvider(mockConnector, mockConnector))
@@ -109,7 +109,7 @@ class AccessCodeServiceSpec extends AnyFreeSpec with Matchers with ScalaCheckDri
         val exception     = new IllegalStateException()
         val error         = ConnectorError.Unexpected("oops", Some(exception))
         val mockConnector = mock[EISConnector]
-        when(mockConnector.postAccessCodeRequest(GuaranteeReferenceNumber(any()), any())(any())).thenReturn(EitherT.leftT(error))
+        when(mockConnector.postAccessCodeRequest(GuaranteeReferenceNumber(any()), AccessCode(any()), any())(any())).thenReturn(EitherT.leftT(error))
 
         val sut = new AccessCodeServiceImpl(FakeEISConnectorProvider(mockConnector, mockConnector))
 

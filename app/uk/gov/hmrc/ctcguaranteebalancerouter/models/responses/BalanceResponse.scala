@@ -18,10 +18,11 @@ package uk.gov.hmrc.ctcguaranteebalancerouter.models.responses
 
 import play.api.libs.json.Json
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.Balance
+import uk.gov.hmrc.ctcguaranteebalancerouter.models.CurrencyCL
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.GuaranteeReferenceNumber
 
 object BalanceResponse {
   implicit val balanceResponseFormat = Json.format[BalanceResponse]
 }
 
-case class BalanceResponse(grn: GuaranteeReferenceNumber, balance: Balance, currencyCL: String)
+case class BalanceResponse(grn: GuaranteeReferenceNumber, balance: Balance, currencyCL: CurrencyCL)

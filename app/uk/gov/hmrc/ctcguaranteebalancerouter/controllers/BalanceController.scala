@@ -54,12 +54,12 @@ class BalanceController @Inject() (
     auth(endpointPermission).async[RouterBalanceRequest](parse.json[RouterBalanceRequest]) {
       implicit request =>
         (for {
-          country <- countryExtractionService.extractCountry(grn).asPresentation
-          _       <- accessCodeService.ensureAccessCodeValid(grn, request.body.accessCode, country).asPresentation
-          balance <- balanceRetrievalService.getBalance(grn, country).asPresentation
-        } yield balance).fold(
+          country         <- countryExtractionService.extractCountry(grn).asPresentation
+          _               <- accessCodeService.ensureAccessCodeValid(grn, request.body.accessCode, country).asPresentation
+          balanceResponse <- balanceRetrievalService.getBalance(grn, request.body.accessCode, country).asPresentation
+        } yield balanceResponse).fold(
           presentationError => Status(presentationError.code.statusCode)(Json.toJson(presentationError)),
-          balance => Ok(Json.toJson(responses.RouterBalanceResponse(balance)))
+          balanceResponse => Ok(Json.toJson(responses.RouterBalanceResponse(balanceResponse.balance)))
         )
     }
 }

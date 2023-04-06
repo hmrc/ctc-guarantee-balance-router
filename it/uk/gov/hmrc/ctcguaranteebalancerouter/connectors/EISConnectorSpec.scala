@@ -42,7 +42,6 @@ import retry.RetryPolicies
 import retry.RetryPolicy
 import uk.gov.hmrc.ctcguaranteebalancerouter.config.CircuitBreakerConfig
 import uk.gov.hmrc.ctcguaranteebalancerouter.config.EISInstanceConfig
-import uk.gov.hmrc.ctcguaranteebalancerouter.config.EISURIsConfig
 import uk.gov.hmrc.ctcguaranteebalancerouter.config.Headers
 import uk.gov.hmrc.ctcguaranteebalancerouter.config.RetryConfig
 import uk.gov.hmrc.ctcguaranteebalancerouter.itbase.Generators
@@ -56,7 +55,6 @@ import uk.gov.hmrc.ctcguaranteebalancerouter.models.errors.ConnectorError
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.responses.AccessCodeResponse
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.http.HttpResponse
-import uk.gov.hmrc.http.UpstreamErrorResponse
 import uk.gov.hmrc.http.client.HttpClientV2
 import uk.gov.hmrc.http.test.HttpClientV2Support
 
@@ -96,8 +94,8 @@ class EISConnectorSpec
       RetryPolicies.limitRetries[Future](1)(cats.implicits.catsStdInstancesForFuture(ec))
   }
 
-  def accessCodeUri(grn: GuaranteeReferenceNumber) = s"/guarantees/${grn.value}/access-codes"
-  def balanceUri(grn: GuaranteeReferenceNumber)    = s"/guarantees/${grn.value}/balance"
+  def accessCodeUri(grn: GuaranteeReferenceNumber) = s"/ctc-guarantee-balance-eis-stub/guarantees/${grn.value}/access-codes"
+  def balanceUri(grn: GuaranteeReferenceNumber)    = s"/ctc-guarantee-balance-eis-stub/guarantees/${grn.value}/balance"
 
   val connectorConfig: EISInstanceConfig = EISInstanceConfig(
     "http",
@@ -215,7 +213,7 @@ class EISConnectorSpec
 
         val hc = HeaderCarrier()
 
-        whenReady(connector().postAccessCodeRequest(grn, hc).value) {
+        whenReady(connector().postAccessCodeRequest(grn, AccessCode("ABCD"), hc).value) {
           case Right(AccessCodeResponse(GuaranteeReferenceNumber(grn.value), AccessCode("ABCD"), List(AccessCode("AB34")))) =>
             verify(loggerMock, times(0)).error(anyString())(any())
           case Right(x) => fail(s"Got $x, which was not expected")
@@ -252,7 +250,7 @@ class EISConnectorSpec
 
       val hc = HeaderCarrier()
 
-      whenReady(oneRetryConnector.postAccessCodeRequest(grn, hc).value) {
+      whenReady(oneRetryConnector.postAccessCodeRequest(grn, AccessCode("ABCD"), hc).value) {
         case Right(AccessCodeResponse(GuaranteeReferenceNumber(grn.value), AccessCode("ABCD"), List(AccessCode("AB34")))) =>
           verify(loggerMock, times(1)).error(anyString())(any())
         case Right(x) =>
@@ -283,7 +281,7 @@ class EISConnectorSpec
 
         val hc = HeaderCarrier()
 
-        whenReady(connector().postAccessCodeRequest(grn, hc).value) {
+        whenReady(connector().postAccessCodeRequest(grn, AccessCode("ABCD"), hc).value) {
           case Left(ConnectorError.InvalidAccessCode) => verify(loggerMock, times(1)).error(anyString())(any())
           case x                                      => fail(s"Left was not a ConnectorError.InvalidAccessCode (got $x)")
         }
@@ -308,7 +306,7 @@ class EISConnectorSpec
 
         val hc = HeaderCarrier()
 
-        whenReady(connector().postAccessCodeRequest(grn, hc).value) {
+        whenReady(connector().postAccessCodeRequest(grn, AccessCode("ABCD"), hc).value) {
           case Left(ConnectorError.GrnNotFound) => verify(loggerMock, times(1)).error(anyString())(any())
           case x                                => fail(s"Left was not a ConnectorError.GrnNotFound (got $x)")
         }
@@ -328,7 +326,7 @@ class EISConnectorSpec
 
     when(httpClientV2.post(any[URL])(any[HeaderCarrier])).thenReturn(new FakeRequestBuilder)
 
-    whenReady(connector.postAccessCodeRequest(GuaranteeReferenceNumber("abc"), hc).value) {
+    whenReady(connector.postAccessCodeRequest(GuaranteeReferenceNumber("abc"), AccessCode("ABCD"), hc).value) {
       case Left(x: ConnectorError.Unexpected) =>
         verify(loggerMock, times(1)).error(anyString())(any())
         x.cause.get mustBe a[RuntimeException]

@@ -19,6 +19,8 @@ package uk.gov.hmrc.ctcguaranteebalancerouter.models.errors
 sealed trait AccessCodeError
 
 object AccessCodeError {
+
+  case object GrnNotFound                                        extends AccessCodeError
   case object InvalidAccessCode                                  extends AccessCodeError
   case object FailedToDeserialise                                extends AccessCodeError
   case class Unexpected(message: String, thr: Option[Throwable]) extends AccessCodeError
