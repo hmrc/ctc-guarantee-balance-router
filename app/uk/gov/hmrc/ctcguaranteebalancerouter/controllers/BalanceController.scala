@@ -21,8 +21,8 @@ import play.api.mvc.Action
 import play.api.mvc.ControllerComponents
 import uk.gov.hmrc.ctcguaranteebalancerouter.controllers.actions.InternalAuthActionProvider
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.GuaranteeReferenceNumber
-import uk.gov.hmrc.ctcguaranteebalancerouter.models.RouterBalanceRequest
-import uk.gov.hmrc.ctcguaranteebalancerouter.models.RouterBalanceResponse
+import uk.gov.hmrc.ctcguaranteebalancerouter.models.responses
+import uk.gov.hmrc.ctcguaranteebalancerouter.models.requests.RouterBalanceRequest
 import uk.gov.hmrc.ctcguaranteebalancerouter.services.AccessCodeService
 import uk.gov.hmrc.ctcguaranteebalancerouter.services.BalanceRetrievalService
 import uk.gov.hmrc.ctcguaranteebalancerouter.services.CountryExtractionService
@@ -54,12 +54,12 @@ class BalanceController @Inject() (
     auth(endpointPermission).async[RouterBalanceRequest](parse.json[RouterBalanceRequest]) {
       implicit request =>
         (for {
-          country <- countryExtractionService.extractCountry(grn).asPresentation
-          _       <- accessCodeService.ensureAccessCodeValid(grn, request.body.accessCode, country).asPresentation
-          balance <- balanceRetrievalService.getBalance(grn, country).asPresentation
-        } yield balance).fold(
+          country         <- countryExtractionService.extractCountry(grn).asPresentation
+          _               <- accessCodeService.ensureAccessCodeValid(grn, request.body.accessCode, country).asPresentation
+          balanceResponse <- balanceRetrievalService.getBalance(grn, request.body.accessCode, country).asPresentation
+        } yield balanceResponse).fold(
           presentationError => Status(presentationError.code.statusCode)(Json.toJson(presentationError)),
-          balance => Ok(Json.toJson(RouterBalanceResponse(balance)))
+          balanceResponse => Ok(Json.toJson(responses.RouterBalanceResponse(balanceResponse.balance, balanceResponse.currencyCL)))
         )
     }
 }

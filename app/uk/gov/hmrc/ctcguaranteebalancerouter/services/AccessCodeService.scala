@@ -46,19 +46,14 @@ class AccessCodeServiceImpl @Inject() (connectorProvider: EISConnectorProvider) 
     ec: ExecutionContext
   ): EitherT[Future, AccessCodeError, Unit] =
     for {
-      result <- connectorProvider(countryCode).postAccessCodeRequest(grn, hc).leftMap(handleRoutingError)
-      _      <- validateCode(accessCode, result.accessCode)
+      _ <- connectorProvider(countryCode).postAccessCodeRequest(grn, accessCode, hc).leftMap(handleRoutingError)
     } yield ()
-
-  private def validateCode(providedCode: AccessCode, expectedCode: AccessCode)(implicit ec: ExecutionContext): EitherT[Future, AccessCodeError, Unit] =
-    if (providedCode == expectedCode) EitherT.rightT(())
-    else EitherT.leftT(AccessCodeError.InvalidAccessCode)
 
   // EIS will only return select status codes, so we need to infer from there
   private def handleRoutingError(error: ConnectorError): AccessCodeError = error match {
-    case ConnectorError.NotFound                   => AccessCodeError.NotFound
+    case ConnectorError.InvalidAccessCode          => AccessCodeError.InvalidAccessCode
+    case ConnectorError.GrnNotFound                => AccessCodeError.GrnNotFound
     case ConnectorError.FailedToDeserialise        => AccessCodeError.FailedToDeserialise
-    case ConnectorError.Upstream(error)            => AccessCodeError.Unexpected("Upstream Error", Some(error))
     case ConnectorError.Unexpected(message, error) => AccessCodeError.Unexpected(message, error)
   }
 

@@ -21,7 +21,9 @@ import org.scalacheck.Gen
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.AccessCode
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.Balance
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.CountryCode
+import uk.gov.hmrc.ctcguaranteebalancerouter.models.CurrencyCL
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.GuaranteeReferenceNumber
+import uk.gov.hmrc.ctcguaranteebalancerouter.models.responses.BalanceResponse
 
 trait Generators {
 
@@ -42,6 +44,13 @@ trait Generators {
 
   implicit val arbitraryAccessCode: Arbitrary[AccessCode] = Arbitrary {
     Gen.stringOfN(4, Gen.alphaNumChar).map(AccessCode(_))
+  }
+
+  implicit val arbitraryBalanceResponse: Arbitrary[BalanceResponse] = Arbitrary {
+    for {
+      grn     <- arbitraryGuaranteeReferenceNumberGenerator.arbitrary
+      balance <- arbitraryBalance.arbitrary
+    } yield BalanceResponse(grn, balance, CurrencyCL("GBP"))
   }
 
   implicit val arbitraryCountryCode: Arbitrary[CountryCode] = Arbitrary {

@@ -44,11 +44,11 @@ import uk.gov.hmrc.ctcguaranteebalancerouter.config.AppConfig
 import uk.gov.hmrc.ctcguaranteebalancerouter.controllers.actions.InternalAuthActionProvider
 import uk.gov.hmrc.ctcguaranteebalancerouter.controllers.actions.InternalAuthActionProviderImpl
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.AccessCode
-import uk.gov.hmrc.ctcguaranteebalancerouter.models.Balance
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.CountryCode
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.GuaranteeReferenceNumber
-import uk.gov.hmrc.ctcguaranteebalancerouter.models.RouterBalanceRequest
+import uk.gov.hmrc.ctcguaranteebalancerouter.models.requests
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.errors.AccessCodeError
+import uk.gov.hmrc.ctcguaranteebalancerouter.models.responses.BalanceResponse
 import uk.gov.hmrc.ctcguaranteebalancerouter.services.AccessCodeService
 import uk.gov.hmrc.ctcguaranteebalancerouter.services.BalanceRetrievalService
 import uk.gov.hmrc.ctcguaranteebalancerouter.services.CountryExtractionService
@@ -56,16 +56,13 @@ import uk.gov.hmrc.ctcguaranteebalancerouter.utils.Generators
 import uk.gov.hmrc.http.UpstreamErrorResponse
 import uk.gov.hmrc.internalauth.client.IAAction
 import uk.gov.hmrc.internalauth.client.Predicate
-import uk.gov.hmrc.internalauth.client.Predicate.Permission
 import uk.gov.hmrc.internalauth.client.Resource
 import uk.gov.hmrc.internalauth.client.ResourceLocation
 import uk.gov.hmrc.internalauth.client.ResourceType
-import uk.gov.hmrc.internalauth.client.Retrieval
 import uk.gov.hmrc.internalauth.client.Retrieval.EmptyRetrieval
 import uk.gov.hmrc.internalauth.client.test.BackendAuthComponentsStub
 import uk.gov.hmrc.internalauth.client.test.StubBehaviour
 
-import java.lang.reflect.Method
 import scala.concurrent.ExecutionContext
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -83,9 +80,9 @@ class BalanceControllerSpec extends AnyFreeSpec with Matchers with MockitoSugar 
       "valid GRN will return a balance" in forAll(
         arbitrary[GuaranteeReferenceNumber],
         arbitrary[AccessCode],
-        arbitrary[Balance]
+        arbitrary[BalanceResponse]
       ) {
-        (grn, accessCode, balance) =>
+        (grn, accessCode, balanceResponse) =>
           val acs = mock[AccessCodeService]
           val brs = mock[BalanceRetrievalService]
           val ces = mock[CountryExtractionService]
@@ -98,25 +95,25 @@ class BalanceControllerSpec extends AnyFreeSpec with Matchers with MockitoSugar 
             )(any(), any())
           ).thenReturn(EitherT.rightT(()))
 
-          when(brs.getBalance(GuaranteeReferenceNumber(eqTo(grn.value)), any[CountryCode])(any(), any()))
-            .thenReturn(EitherT.rightT(balance))
+          when(brs.getBalance(GuaranteeReferenceNumber(eqTo(grn.value)), AccessCode(eqTo(accessCode.value)), any[CountryCode])(any(), any()))
+            .thenReturn(EitherT.rightT(balanceResponse))
 
           when(ces.extractCountry(GuaranteeReferenceNumber(eqTo(grn.value))))
             .thenReturn(EitherT.rightT(CountryCode.Gb))
 
           val sut    = new BalanceController(acs, brs, ces, stubControllerComponents(), PassthroughAuthProvider)
-          val result = sut.postBalance(grn)(FakeRequest("POST", "/", FakeHeaders(), RouterBalanceRequest(accessCode)))
+          val result = sut.postBalance(grn)(FakeRequest("POST", "/", FakeHeaders(), requests.RouterBalanceRequest(accessCode)))
 
           status(result) mustBe OK
-          contentAsJson(result) mustBe Json.obj("balance" -> balance.value)
+          contentAsJson(result) mustBe Json.obj("balance" -> balanceResponse.balance.value, "currencyCL" -> balanceResponse.currencyCL.value)
       }
 
       "backend failure will return a 500" in forAll(
         arbitrary[GuaranteeReferenceNumber],
         arbitrary[AccessCode],
-        arbitrary[Balance]
+        arbitrary[BalanceResponse]
       ) {
-        (grn, accessCode, balance) =>
+        (grn, accessCode, balanceResponse) =>
           val acs = mock[AccessCodeService]
           val brs = mock[BalanceRetrievalService]
           val ces = mock[CountryExtractionService]
@@ -129,14 +126,14 @@ class BalanceControllerSpec extends AnyFreeSpec with Matchers with MockitoSugar 
             )(any(), any())
           ).thenReturn(EitherT.leftT(AccessCodeError.FailedToDeserialise))
 
-          when(brs.getBalance(GuaranteeReferenceNumber(eqTo(grn.value)), any[CountryCode])(any(), any()))
-            .thenReturn(EitherT.rightT(balance))
+          when(brs.getBalance(GuaranteeReferenceNumber(eqTo(grn.value)), AccessCode(eqTo(accessCode.value)), any[CountryCode])(any(), any()))
+            .thenReturn(EitherT.rightT(balanceResponse))
 
           when(ces.extractCountry(GuaranteeReferenceNumber(eqTo(grn.value))))
             .thenReturn(EitherT.rightT(CountryCode.Gb))
 
           val sut    = new BalanceController(acs, brs, ces, stubControllerComponents(), PassthroughAuthProvider)
-          val result = sut.postBalance(grn)(FakeRequest("POST", "/", FakeHeaders(), RouterBalanceRequest(accessCode)))
+          val result = sut.postBalance(grn)(FakeRequest("POST", "/", FakeHeaders(), requests.RouterBalanceRequest(accessCode)))
 
           status(result) mustBe INTERNAL_SERVER_ERROR
       }
@@ -152,9 +149,9 @@ class BalanceControllerSpec extends AnyFreeSpec with Matchers with MockitoSugar 
     "when provided a valid token" in forAll(
       arbitrary[GuaranteeReferenceNumber],
       arbitrary[AccessCode],
-      arbitrary[Balance]
+      arbitrary[BalanceResponse]
     ) {
-      (grn, accessCode, balance) =>
+      (grn, accessCode, balanceResponse) =>
         val acs = mock[AccessCodeService]
         val brs = mock[BalanceRetrievalService]
         val ces = mock[CountryExtractionService]
@@ -182,18 +179,18 @@ class BalanceControllerSpec extends AnyFreeSpec with Matchers with MockitoSugar 
           )(any(), any())
         ).thenReturn(EitherT.rightT(()))
 
-        when(brs.getBalance(GuaranteeReferenceNumber(eqTo(grn.value)), any[CountryCode])(any(), any()))
-          .thenReturn(EitherT.rightT(balance))
+        when(brs.getBalance(GuaranteeReferenceNumber(eqTo(grn.value)), AccessCode(eqTo(accessCode.value)), any[CountryCode])(any(), any()))
+          .thenReturn(EitherT.rightT(balanceResponse))
 
         when(ces.extractCountry(GuaranteeReferenceNumber(eqTo(grn.value))))
           .thenReturn(EitherT.rightT(CountryCode.Gb))
 
         val sut = new BalanceController(acs, brs, ces, stubControllerComponents(), internalAuthActionProvider)
         val result =
-          sut.postBalance(grn)(FakeRequest("POST", "/", FakeHeaders(Seq(HeaderNames.AUTHORIZATION -> "Token 1234")), RouterBalanceRequest(accessCode)))
+          sut.postBalance(grn)(FakeRequest("POST", "/", FakeHeaders(Seq(HeaderNames.AUTHORIZATION -> "Token 1234")), requests.RouterBalanceRequest(accessCode)))
 
         status(result) mustBe OK
-        contentAsJson(result) mustBe Json.obj("balance" -> balance.value)
+        contentAsJson(result) mustBe Json.obj("balance" -> balanceResponse.balance.value, "currencyCL" -> balanceResponse.currencyCL.value)
 
     }
   }

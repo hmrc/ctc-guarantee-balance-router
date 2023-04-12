@@ -14,15 +14,12 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.ctcguaranteebalancerouter.models.errors
+package uk.gov.hmrc.ctcguaranteebalancerouter.models
 
-sealed trait ConnectorError
+import play.api.libs.json.Json
 
-object ConnectorError {
-  case object FailedToDeserialise extends ConnectorError
+case class CurrencyCL(value: String) extends AnyVal
 
-  case object GrnNotFound extends ConnectorError
-
-  case object InvalidAccessCode                                    extends ConnectorError
-  case class Unexpected(message: String, cause: Option[Throwable]) extends ConnectorError
+object CurrencyCL {
+  implicit val format = Json.valueFormat[CurrencyCL]
 }

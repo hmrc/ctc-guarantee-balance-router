@@ -14,12 +14,13 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.ctcguaranteebalancerouter.models
+package uk.gov.hmrc.ctcguaranteebalancerouter.models.requests
 
 import play.api.libs.json.Json
+import uk.gov.hmrc.ctcguaranteebalancerouter.models.AccessCode
 
-object BalanceResponse {
-  implicit val balanceResponseFormat = Json.format[BalanceResponse]
+object RouterBalanceRequest {
+  implicit val routerBalanceRequestFormat = Json.format[RouterBalanceRequest]
 }
 
-case class BalanceResponse(GRN: GuaranteeReferenceNumber, remainingBalance: Balance)
+case class RouterBalanceRequest(accessCode: AccessCode)
