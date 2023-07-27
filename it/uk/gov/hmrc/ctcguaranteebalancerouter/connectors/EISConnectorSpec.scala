@@ -210,7 +210,7 @@ class EISConnectorSpec
         val secondState = "should now fail"
 
         stub(Scenario.STARTED, secondState, OK, accessCodeResponseBody(grn))
-        stub(secondState, secondState, INTERNAL_SERVER_ERROR, invalidAccessCodeResponseBody)
+        stub(secondState, secondState, FORBIDDEN, invalidAccessCodeResponseBody)
 
         val hc = HeaderCarrier()
 
@@ -277,7 +277,7 @@ class EISConnectorSpec
           ).withHeader("Authorization", equalTo("Bearer bearertokenhereGB"))
             .withHeader(HeaderNames.ACCEPT, equalTo("application/json"))
             .withHeader("X-Correlation-Id", matching(RegexPatterns.UUID))
-            .willReturn(aResponse().withStatus(INTERNAL_SERVER_ERROR).withBody(invalidAccessCodeResponseBody))
+            .willReturn(aResponse().withStatus(FORBIDDEN).withBody(invalidAccessCodeResponseBody))
         )
 
         val hc = HeaderCarrier()
@@ -302,7 +302,7 @@ class EISConnectorSpec
           ).withHeader("Authorization", equalTo("Bearer bearertokenhereGB"))
             .withHeader(HeaderNames.ACCEPT, equalTo("application/json"))
             .withHeader("X-Correlation-Id", matching(RegexPatterns.UUID))
-            .willReturn(aResponse().withStatus(INTERNAL_SERVER_ERROR).withBody(grnNotFoundResponseBody(grn)))
+            .willReturn(aResponse().withStatus(FORBIDDEN).withBody(grnNotFoundResponseBody(grn)))
         )
 
         val hc = HeaderCarrier()
@@ -348,9 +348,9 @@ class EISConnectorSpec
         // we have to ensure that any success result is not retried. To do this, we make the stub return
         // a 202 status the first time it is called, then we transition it into a state where it'll return
         // an error. As the retry algorithm should not attempt a retry on a 202, the stub should only be
-        // called once - so a 500 should never be returned.
+        // called once - so a 403 should never be returned.
         //
-        // If a 500 error is returned, this most likely means a retry happened, the first place to look
+        // If a 403 error is returned, this most likely means a retry happened, the first place to look
         // should be the code the determines if a result is successful.
 
         def stub(currentState: String, targetState: String, codeToReturn: Int, body: String) =
@@ -374,7 +374,7 @@ class EISConnectorSpec
         val secondState = "should now fail"
 
         stub(Scenario.STARTED, secondState, OK, balanceResponseBody(grn))
-        stub(secondState, secondState, INTERNAL_SERVER_ERROR, grnNotFoundResponseBody(grn))
+        stub(secondState, secondState, FORBIDDEN, grnNotFoundResponseBody(grn))
 
         val hc = HeaderCarrier()
 
@@ -431,7 +431,7 @@ class EISConnectorSpec
           .withHeader("X-Correlation-Id", matching(RegexPatterns.UUID))
           .willReturn(
             aResponse()
-              .withStatus(INTERNAL_SERVER_ERROR)
+              .withStatus(FORBIDDEN)
               .withBody(grnNotFoundResponseBody(grn))
           )
       )
