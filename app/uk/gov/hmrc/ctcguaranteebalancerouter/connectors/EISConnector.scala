@@ -22,6 +22,7 @@ import com.kenshoo.play.metrics.Metrics
 import play.api.Logging
 import play.api.http.HeaderNames
 import play.api.http.MimeTypes
+import play.api.http.Status.FORBIDDEN
 import play.api.http.Status.INTERNAL_SERVER_ERROR
 import play.api.libs.json.JsError
 import play.api.libs.json.JsSuccess
@@ -133,7 +134,7 @@ class EISConnectorImpl(
             .map[Either[ConnectorError, A]] {
               response: HttpResponse =>
                 response.status match {
-                  case INTERNAL_SERVER_ERROR =>
+                  case FORBIDDEN =>
                     logger.error(
                       s"Request Error: Routing to $code failed to retrieve data with status code ${response.status} and message ${response.body}. Request ID: $requestId. Correlation ID: $correlationId"
                     )
