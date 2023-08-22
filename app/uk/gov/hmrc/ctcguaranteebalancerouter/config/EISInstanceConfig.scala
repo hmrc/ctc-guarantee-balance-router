@@ -29,7 +29,7 @@ object EISInstanceConfig {
           config.get[String]("protocol"),
           config.get[String]("host"),
           config.get[Int]("port"),
-          config.get[String]("path"),
+          config.get[EISURIsConfig]("endpoints"),
           config.get[Headers]("headers"),
           config.get[CircuitBreakerConfig]("circuit-breaker"),
           config.get[RetryConfig]("retry")
@@ -42,12 +42,13 @@ case class EISInstanceConfig(
   protocol: String,
   host: String,
   port: Int,
-  path: String,
+  paths: EISURIsConfig,
   headers: Headers,
   circuitBreaker: CircuitBreakerConfig,
   retryConfig: RetryConfig
 ) {
 
-  lazy val eisUrl: String = s"$protocol://$host:$port$path"
+  lazy val eisAccessCodeUrl: String = s"$protocol://$host:$port${paths.accessCode}"
+  lazy val eisBalanceUrl: String    = s"$protocol://$host:$port${paths.balance}"
 
 }
