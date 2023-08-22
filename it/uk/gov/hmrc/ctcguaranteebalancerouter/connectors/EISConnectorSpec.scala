@@ -42,6 +42,7 @@ import retry.RetryPolicies
 import retry.RetryPolicy
 import uk.gov.hmrc.ctcguaranteebalancerouter.config.CircuitBreakerConfig
 import uk.gov.hmrc.ctcguaranteebalancerouter.config.EISInstanceConfig
+import uk.gov.hmrc.ctcguaranteebalancerouter.config.EISURIsConfig
 import uk.gov.hmrc.ctcguaranteebalancerouter.config.Headers
 import uk.gov.hmrc.ctcguaranteebalancerouter.config.RetryConfig
 import uk.gov.hmrc.ctcguaranteebalancerouter.itbase.Generators
@@ -101,7 +102,10 @@ class EISConnectorSpec
     "http",
     "localhost",
     wiremockPort,
-    "/ctc-guarantee-balance-eis-stub",
+    EISURIsConfig(
+      accessCode = s"/ctc-guarantee-balance-eis-stub/guarantees/{grn}/access-codes",
+      balance = s"/ctc-guarantee-balance-eis-stub/guarantees/{grn}/balance"
+    ),
     Headers("bearertokenhereGB"),
     CircuitBreakerConfig(
       3,

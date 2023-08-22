@@ -23,7 +23,6 @@ import play.api.Logging
 import play.api.http.HeaderNames
 import play.api.http.MimeTypes
 import play.api.http.Status.FORBIDDEN
-import play.api.http.Status.INTERNAL_SERVER_ERROR
 import play.api.libs.json.JsError
 import play.api.libs.json.JsSuccess
 import play.api.libs.json.Json
@@ -86,7 +85,7 @@ class EISConnectorImpl(
   override def postAccessCodeRequest(grn: GuaranteeReferenceNumber, accessCode: AccessCode, hc: HeaderCarrier)(implicit
     ec: ExecutionContext
   ): EitherT[Future, ConnectorError, AccessCodeResponse] = {
-    val url = s"${eisInstanceConfig.eisUrl}/guarantees/${grn.value}/access-codes"
+    val url = eisInstanceConfig.eisAccessCodeUrl.replace("{grn}", grn.value)
 
     post(hc, MetricsKeys.eisAccessCodeEndpoint) {
       headerCarrier =>
@@ -101,7 +100,7 @@ class EISConnectorImpl(
   override def getBalanceRequest(grn: GuaranteeReferenceNumber, hc: HeaderCarrier)(implicit
     ec: ExecutionContext
   ): EitherT[Future, ConnectorError, BalanceResponse] = {
-    val url = s"${eisInstanceConfig.eisUrl}/guarantees/${grn.value}/balance"
+    val url = eisInstanceConfig.eisBalanceUrl.replace("{grn}", grn.value)
     post(hc, MetricsKeys.eisGetBalanceEndpoint) {
       headerCarrier =>
         httpClientV2
