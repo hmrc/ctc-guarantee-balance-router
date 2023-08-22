@@ -29,7 +29,7 @@ object EISInstanceConfig {
           config.get[String]("protocol"),
           config.get[String]("host"),
           config.get[Int]("port"),
-          config.get[EISURIsConfig]("endpoints"),
+          config.get[EISURIsConfig]("paths"),
           config.get[Headers]("headers"),
           config.get[CircuitBreakerConfig]("circuit-breaker"),
           config.get[RetryConfig]("retry")
