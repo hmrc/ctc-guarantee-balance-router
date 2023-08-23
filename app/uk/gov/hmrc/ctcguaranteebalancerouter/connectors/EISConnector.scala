@@ -129,6 +129,7 @@ class EISConnectorImpl(
           "X-Correlation-Id"        -> correlationId,
           "CustomProcessHost"       -> "Digital",
           HeaderNames.ACCEPT        -> MimeTypes.JSON,
+          HeaderNames.CONTENT_TYPE  -> MimeTypes.JSON,
           HeaderNames.AUTHORIZATION -> s"Bearer ${eisInstanceConfig.headers.bearerToken}"
         )
 
