@@ -60,7 +60,10 @@ import uk.gov.hmrc.http.client.HttpClientV2
 import uk.gov.hmrc.http.test.HttpClientV2Support
 
 import java.net.URL
+import java.time.Clock
+import java.time.LocalDateTime
 import java.time.OffsetDateTime
+import java.time.ZoneOffset
 import scala.concurrent.ExecutionContext
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -122,30 +125,32 @@ class EISConnectorSpec
     )
   )
 
+  val clock = Clock.fixed(LocalDateTime.of(2023, 8, 23, 12, 39, 31, 0).toInstant(ZoneOffset.UTC), ZoneOffset.UTC)
+
   val loggerMock: Logger = mock[Logger]
 
   // We construct the connector each time to avoid issues with the circuit breaker
   def noRetriesConnector: EISConnectorImpl =
-    new EISConnectorImpl("NoRetry", connectorConfig, TestHelpers.headerCarrierConfig, httpClientV2, NoRetries, new TestMetrics) {
+    new EISConnectorImpl("NoRetry", connectorConfig, TestHelpers.headerCarrierConfig, httpClientV2, NoRetries, new TestMetrics, clock) {
       override protected val logger: Logger = loggerMock
 
       override protected def logAttemptedRetry(message: String, retryDetails: RetryDetails): Unit = ()
     }
 
   def noRetriesConnectorWithRetryLogging: EISConnectorImpl =
-    new EISConnectorImpl("NoRetry", connectorConfig, TestHelpers.headerCarrierConfig, httpClientV2, NoRetries, new TestMetrics) {
+    new EISConnectorImpl("NoRetry", connectorConfig, TestHelpers.headerCarrierConfig, httpClientV2, NoRetries, new TestMetrics, clock) {
       override protected val logger: Logger = loggerMock
     }
 
   def oneRetryConnector: EISConnectorImpl =
-    new EISConnectorImpl("OneRetry", connectorConfig, TestHelpers.headerCarrierConfig, httpClientV2, OneRetry, new TestMetrics) {
+    new EISConnectorImpl("OneRetry", connectorConfig, TestHelpers.headerCarrierConfig, httpClientV2, OneRetry, new TestMetrics, clock) {
       override protected val logger: Logger = loggerMock
 
       override protected def logAttemptedRetry(message: String, retryDetails: RetryDetails): Unit = ()
     }
 
   val errorTestConnector: EISConnectorImpl =
-    new EISConnectorImpl("NoRetry", connectorConfig, TestHelpers.headerCarrierConfig, httpClientV2, NoRetries, new TestMetrics) {
+    new EISConnectorImpl("NoRetry", connectorConfig, TestHelpers.headerCarrierConfig, httpClientV2, NoRetries, new TestMetrics, clock) {
       override protected val logger: Logger = loggerMock
 
       override protected def logAttemptedRetry(message: String, retryDetails: RetryDetails): Unit = ()
@@ -199,6 +204,7 @@ class EISConnectorSpec
             )
               .inScenario("Standard Call")
               .whenScenarioStateIs(currentState)
+              .withHeader("Date", equalTo("Wed, 23 Aug 2023 12:39:31 UTC"))
               .withHeader("Authorization", equalTo("Bearer bearertokenhereGB"))
               .withHeader("X-Correlation-Id", matching(RegexPatterns.UUID))
               .withHeader("CustomProcessHost", equalTo("Digital"))
@@ -236,6 +242,7 @@ class EISConnectorSpec
             .inScenario("Flaky Call")
             .whenScenarioStateIs(currentState)
             .willSetStateTo(targetState)
+            .withHeader("Date", equalTo("Wed, 23 Aug 2023 12:39:31 UTC"))
             .withHeader("Authorization", equalTo("Bearer bearertokenhereGB"))
             .withHeader("X-Correlation-Id", matching(RegexPatterns.UUID))
             .withHeader("CustomProcessHost", equalTo("Digital"))
@@ -279,6 +286,7 @@ class EISConnectorSpec
           post(
             urlEqualTo(accessCodeUri(grn))
           ).withHeader("Authorization", equalTo("Bearer bearertokenhereGB"))
+            .withHeader("Date", equalTo("Wed, 23 Aug 2023 12:39:31 UTC"))
             .withHeader(HeaderNames.ACCEPT, equalTo("application/json"))
             .withHeader("X-Correlation-Id", matching(RegexPatterns.UUID))
             .willReturn(aResponse().withStatus(FORBIDDEN).withBody(invalidAccessCodeResponseBody))
@@ -304,6 +312,7 @@ class EISConnectorSpec
           post(
             urlEqualTo(accessCodeUri(grn))
           ).withHeader("Authorization", equalTo("Bearer bearertokenhereGB"))
+            .withHeader("Date", equalTo("Wed, 23 Aug 2023 12:39:31 UTC"))
             .withHeader(HeaderNames.ACCEPT, equalTo("application/json"))
             .withHeader("X-Correlation-Id", matching(RegexPatterns.UUID))
             .willReturn(aResponse().withStatus(FORBIDDEN).withBody(grnNotFoundResponseBody(grn)))
@@ -323,7 +332,7 @@ class EISConnectorSpec
     val httpClientV2 = mock[HttpClientV2]
 
     val hc = HeaderCarrier()
-    val connector = new EISConnectorImpl("Failure Test", connectorConfig, TestHelpers.headerCarrierConfig, httpClientV2, NoRetries, new TestMetrics) {
+    val connector = new EISConnectorImpl("Failure Test", connectorConfig, TestHelpers.headerCarrierConfig, httpClientV2, NoRetries, new TestMetrics, clock) {
       override protected val logger: Logger = loggerMock
 
       override def retryLogging(response: Either[ConnectorError, _], retryDetails: RetryDetails): Unit = ()
@@ -364,6 +373,7 @@ class EISConnectorSpec
             )
               .inScenario("Standard Call")
               .whenScenarioStateIs(currentState)
+              .withHeader("Date", equalTo("Wed, 23 Aug 2023 12:39:31 UTC"))
               .withHeader("X-Correlation-Id", matching(RegexPatterns.UUID))
               .withHeader("CustomProcessHost", equalTo("Digital"))
               .withHeader(HeaderNames.ACCEPT, equalTo("application/json"))
@@ -400,6 +410,7 @@ class EISConnectorSpec
             .inScenario("Flaky Call")
             .whenScenarioStateIs(currentState)
             .willSetStateTo(targetState)
+            .withHeader("Date", equalTo("Wed, 23 Aug 2023 12:39:31 UTC"))
             .withHeader("Authorization", equalTo("Bearer bearertokenhereGB"))
             .withHeader(HeaderNames.ACCEPT, equalTo("application/json"))
             .withHeader("X-Correlation-Id", matching(RegexPatterns.UUID))
@@ -431,6 +442,7 @@ class EISConnectorSpec
         get(
           urlEqualTo(balanceUri(grn))
         ).withHeader("Authorization", equalTo("Bearer bearertokenhereGB"))
+          .withHeader("Date", equalTo("Wed, 23 Aug 2023 12:39:31 UTC"))
           .withHeader(HeaderNames.ACCEPT, equalTo("application/json"))
           .withHeader("X-Correlation-Id", matching(RegexPatterns.UUID))
           .willReturn(
@@ -454,7 +466,7 @@ class EISConnectorSpec
       val httpClientV2 = mock[HttpClientV2]
 
       val hc        = HeaderCarrier()
-      val connector = new EISConnectorImpl("Failure", connectorConfig, TestHelpers.headerCarrierConfig, httpClientV2, NoRetries, new TestMetrics)
+      val connector = new EISConnectorImpl("Failure", connectorConfig, TestHelpers.headerCarrierConfig, httpClientV2, NoRetries, new TestMetrics, clock)
 
       when(httpClientV2.get(any[URL])(any[HeaderCarrier])).thenReturn(new FakeRequestBuilder)
 
