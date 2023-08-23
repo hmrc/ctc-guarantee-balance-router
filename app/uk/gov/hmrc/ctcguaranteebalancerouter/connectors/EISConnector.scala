@@ -48,6 +48,11 @@ import uk.gov.hmrc.http.client.HttpClientV2
 import uk.gov.hmrc.http.client.RequestBuilder
 import uk.gov.hmrc.http.{HeaderNames => HMRCHeaderNames}
 
+import java.time.Clock
+import java.time.OffsetDateTime
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 import java.util.UUID
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
@@ -71,7 +76,8 @@ class EISConnectorImpl(
   headerCarrierConfig: HeaderCarrier.Config,
   httpClientV2: HttpClientV2,
   val retries: Retries,
-  val metrics: Metrics
+  val metrics: Metrics,
+  val clock: Clock
 )(implicit val materializer: Materializer)
     extends EISConnector
     with EndpointProtection
@@ -81,6 +87,8 @@ class EISConnectorImpl(
   override val retryConfig: RetryConfig = eisInstanceConfig.retryConfig
 
   override val circuitBreakerConfig: CircuitBreakerConfig = eisInstanceConfig.circuitBreaker
+
+  private val HTTP_DATE_FORMATTER = DateTimeFormatter.ofPattern("EEE, dd MMM yyyy HH:mm:ss", Locale.ENGLISH).withZone(ZoneOffset.UTC)
 
   override def postAccessCodeRequest(grn: GuaranteeReferenceNumber, accessCode: AccessCode, hc: HeaderCarrier)(implicit
     ec: ExecutionContext
@@ -117,6 +125,7 @@ class EISConnectorImpl(
         val correlationId = UUID.randomUUID().toString
         val requestId     = hc.requestId.getOrElse("unknown")
         val requestHeaders = hc.headers(Seq(HMRCHeaderNames.xRequestId)) ++ Seq(
+          "Date"                    -> s"${HTTP_DATE_FORMATTER.format(OffsetDateTime.now(clock))} UTC",
           "X-Correlation-Id"        -> correlationId,
           "CustomProcessHost"       -> "Digital",
           HeaderNames.ACCEPT        -> MimeTypes.JSON,
