@@ -209,6 +209,7 @@ class EISConnectorSpec
               .withHeader("X-Correlation-Id", matching(RegexPatterns.UUID))
               .withHeader("CustomProcessHost", equalTo("Digital"))
               .withHeader(HeaderNames.ACCEPT, equalTo("application/json"))
+              .withHeader(HeaderNames.CONTENT_TYPE, equalTo("application/json"))
               .willReturn(
                 aResponse()
                   .withStatus(codeToReturn)
@@ -247,6 +248,7 @@ class EISConnectorSpec
             .withHeader("X-Correlation-Id", matching(RegexPatterns.UUID))
             .withHeader("CustomProcessHost", equalTo("Digital"))
             .withHeader(HeaderNames.ACCEPT, equalTo("application/json"))
+            .withHeader(HeaderNames.CONTENT_TYPE, equalTo("application/json"))
             .willReturn(
               aResponse()
                 .withStatus(codeToReturn)
@@ -288,6 +290,7 @@ class EISConnectorSpec
           ).withHeader("Authorization", equalTo("Bearer bearertokenhereGB"))
             .withHeader("Date", equalTo("Wed, 23 Aug 2023 12:39:31 UTC"))
             .withHeader(HeaderNames.ACCEPT, equalTo("application/json"))
+            .withHeader(HeaderNames.CONTENT_TYPE, equalTo("application/json"))
             .withHeader("X-Correlation-Id", matching(RegexPatterns.UUID))
             .willReturn(aResponse().withStatus(FORBIDDEN).withBody(invalidAccessCodeResponseBody))
         )
@@ -314,6 +317,7 @@ class EISConnectorSpec
           ).withHeader("Authorization", equalTo("Bearer bearertokenhereGB"))
             .withHeader("Date", equalTo("Wed, 23 Aug 2023 12:39:31 UTC"))
             .withHeader(HeaderNames.ACCEPT, equalTo("application/json"))
+            .withHeader(HeaderNames.CONTENT_TYPE, equalTo("application/json"))
             .withHeader("X-Correlation-Id", matching(RegexPatterns.UUID))
             .willReturn(aResponse().withStatus(FORBIDDEN).withBody(grnNotFoundResponseBody(grn)))
         )
@@ -377,6 +381,7 @@ class EISConnectorSpec
               .withHeader("X-Correlation-Id", matching(RegexPatterns.UUID))
               .withHeader("CustomProcessHost", equalTo("Digital"))
               .withHeader(HeaderNames.ACCEPT, equalTo("application/json"))
+              .withHeader(HeaderNames.CONTENT_TYPE, equalTo("application/json"))
               .willReturn(
                 aResponse()
                   .withStatus(codeToReturn)
@@ -413,6 +418,7 @@ class EISConnectorSpec
             .withHeader("Date", equalTo("Wed, 23 Aug 2023 12:39:31 UTC"))
             .withHeader("Authorization", equalTo("Bearer bearertokenhereGB"))
             .withHeader(HeaderNames.ACCEPT, equalTo("application/json"))
+            .withHeader(HeaderNames.CONTENT_TYPE, equalTo("application/json"))
             .withHeader("X-Correlation-Id", matching(RegexPatterns.UUID))
             .willReturn(
               aResponse()
@@ -444,6 +450,7 @@ class EISConnectorSpec
         ).withHeader("Authorization", equalTo("Bearer bearertokenhereGB"))
           .withHeader("Date", equalTo("Wed, 23 Aug 2023 12:39:31 UTC"))
           .withHeader(HeaderNames.ACCEPT, equalTo("application/json"))
+          .withHeader(HeaderNames.CONTENT_TYPE, equalTo("application/json"))
           .withHeader("X-Correlation-Id", matching(RegexPatterns.UUID))
           .willReturn(
             aResponse()
