@@ -81,6 +81,23 @@ class AccessCodeServiceSpec extends AnyFreeSpec with Matchers with ScalaCheckDri
         }
     }
 
+    "on invalid guarantee type, return a Left of AccessCodeError.InvalidGuaranteeType" in forAll(
+      arbitrary[GuaranteeReferenceNumber],
+      arbitrary[AccessCode],
+      arbitrary[CountryCode]
+    ) {
+      (grn, accessCode, countryCode) =>
+        val mockConnector = mock[EISConnector]
+        when(mockConnector.postAccessCodeRequest(GuaranteeReferenceNumber(any()), AccessCode(any()), any())(any()))
+          .thenReturn(EitherT.leftT(ConnectorError.InvalidGuaranteeType))
+
+        val sut = new AccessCodeServiceImpl(FakeEISConnectorProvider(mockConnector, mockConnector))
+
+        whenReady(sut.ensureAccessCodeValid(grn, accessCode, countryCode).value, Timeout(1.second)) {
+          _ mustBe Left(AccessCodeError.InvalidGuaranteeType)
+        }
+    }
+
     "on invalid Json, return a Left of AccessCodeError.FailedToDeserialise" in forAll(
       arbitrary[GuaranteeReferenceNumber],
       arbitrary[AccessCode],

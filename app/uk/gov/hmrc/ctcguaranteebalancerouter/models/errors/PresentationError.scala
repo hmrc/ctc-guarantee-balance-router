@@ -31,6 +31,9 @@ object PresentationError {
   def badRequestError(message: String): PresentationError =
     StandardError(message, ErrorCode.BadRequest)
 
+  def invalidGuaranteeTypeError(message: String): PresentationError =
+    StandardError(message, ErrorCode.InvalidGuaranteeType)
+
   def forbiddenError(message: String): PresentationError =
     StandardError(message, ErrorCode.Forbidden)
 

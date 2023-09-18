@@ -48,7 +48,8 @@ class BalanceRetrievalServiceImpl @Inject() (connectorProvider: EISConnectorProv
   ): EitherT[Future, BalanceRetrievalError, BalanceResponse] =
     connectorProvider(countryCode).getBalanceRequest(grn, hc).leftMap(handleConnectorError)
 
-  private def handleConnectorError(error: ConnectorError): BalanceRetrievalError = error match {
+  // we know that we can't get all the connector errors so we don't look for them (@unchecked)
+  private def handleConnectorError(error: ConnectorError): BalanceRetrievalError = (error: @unchecked) match {
     case ConnectorError.Unexpected(message, err) => BalanceRetrievalError.Unexpected(message, err)
     case ConnectorError.FailedToDeserialise      => BalanceRetrievalError.FailedToDeserialise
     case ConnectorError.GrnNotFound              => BalanceRetrievalError.GrnNotFound

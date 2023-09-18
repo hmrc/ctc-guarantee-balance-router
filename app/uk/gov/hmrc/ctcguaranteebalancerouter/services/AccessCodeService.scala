@@ -53,6 +53,7 @@ class AccessCodeServiceImpl @Inject() (connectorProvider: EISConnectorProvider) 
   private def handleRoutingError(error: ConnectorError): AccessCodeError = error match {
     case ConnectorError.InvalidAccessCode          => AccessCodeError.InvalidAccessCode
     case ConnectorError.GrnNotFound                => AccessCodeError.GrnNotFound
+    case ConnectorError.InvalidGuaranteeType       => AccessCodeError.InvalidGuaranteeType
     case ConnectorError.FailedToDeserialise        => AccessCodeError.FailedToDeserialise
     case ConnectorError.Unexpected(message, error) => AccessCodeError.Unexpected(message, error)
   }

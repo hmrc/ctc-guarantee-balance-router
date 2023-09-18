@@ -24,5 +24,6 @@ object ConnectorError {
   case object GrnNotFound extends ConnectorError
 
   case object InvalidAccessCode                                    extends ConnectorError
+  case object InvalidGuaranteeType                                 extends ConnectorError
   case class Unexpected(message: String, cause: Option[Throwable]) extends ConnectorError
 }

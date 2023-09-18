@@ -22,6 +22,7 @@ object AccessCodeError {
 
   case object GrnNotFound                                        extends AccessCodeError
   case object InvalidAccessCode                                  extends AccessCodeError
+  case object InvalidGuaranteeType                               extends AccessCodeError
   case object FailedToDeserialise                                extends AccessCodeError
   case class Unexpected(message: String, thr: Option[Throwable]) extends AccessCodeError
 }
