@@ -21,7 +21,6 @@ import play.api.libs.functional.syntax.unlift
 import play.api.libs.json.OWrites
 import play.api.libs.json.Reads
 import play.api.libs.json.__
-import uk.gov.hmrc.http.UpstreamErrorResponse
 
 object PresentationError {
 
@@ -39,16 +38,6 @@ object PresentationError {
 
   def notFoundError(message: String): PresentationError =
     StandardError(message, ErrorCode.NotFound)
-
-  def rateLimited(message: String): PresentationError =
-    StandardError(message, ErrorCode.TooManyRequests)
-
-  def upstreamServiceError(
-    message: String = "Internal server error",
-    code: ErrorCode = ErrorCode.InternalServerError,
-    cause: UpstreamErrorResponse
-  ): PresentationError =
-    UpstreamServiceError(message, code, cause)
 
   def internalServiceError(
     message: String = "Internal server error",
@@ -79,12 +68,6 @@ sealed abstract class PresentationError extends Product with Serializable {
 }
 
 case class StandardError(message: String, code: ErrorCode) extends PresentationError
-
-case class UpstreamServiceError(
-  message: String = "Internal server error",
-  code: ErrorCode = ErrorCode.InternalServerError,
-  cause: UpstreamErrorResponse
-) extends PresentationError
 
 case class InternalServiceError(
   message: String = "Internal server error",
