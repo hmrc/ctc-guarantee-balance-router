@@ -26,7 +26,10 @@ import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.must.Matchers
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 import play.api.http.HeaderNames
+import play.api.http.Status.BAD_REQUEST
+import play.api.http.Status.FORBIDDEN
 import play.api.http.Status.INTERNAL_SERVER_ERROR
+import play.api.http.Status.NOT_FOUND
 import play.api.http.Status.OK
 import play.api.http.Status.UNAUTHORIZED
 import play.api.libs.json.Json
@@ -106,6 +109,87 @@ class BalanceControllerSpec extends AnyFreeSpec with Matchers with MockitoSugar 
 
           status(result) mustBe OK
           contentAsJson(result) mustBe Json.obj("balance" -> balanceResponse.balance.value, "currencyCL" -> balanceResponse.currencyCL.value)
+      }
+
+      "invalid GRN will return a not found" in forAll(
+        arbitrary[GuaranteeReferenceNumber],
+        arbitrary[AccessCode]
+      ) {
+        (grn, accessCode) =>
+          val acs = mock[AccessCodeService]
+          val brs = mock[BalanceRetrievalService]
+          val ces = mock[CountryExtractionService]
+
+          when(
+            acs.ensureAccessCodeValid(
+              GuaranteeReferenceNumber(eqTo(grn.value)),
+              AccessCode(eqTo(accessCode.value)),
+              any[CountryCode]
+            )(any(), any())
+          ).thenReturn(EitherT.leftT(AccessCodeError.GrnNotFound))
+
+          when(ces.extractCountry(GuaranteeReferenceNumber(eqTo(grn.value))))
+            .thenReturn(EitherT.rightT(CountryCode.Gb))
+
+          val sut    = new BalanceController(acs, brs, ces, stubControllerComponents(), PassthroughAuthProvider)
+          val result = sut.postBalance(grn)(FakeRequest("POST", "/", FakeHeaders(), requests.RouterBalanceRequest(accessCode)))
+
+          status(result) mustBe NOT_FOUND
+          contentAsJson(result) mustBe Json.obj("code" -> "NOT_FOUND", "message" -> "GRN not found")
+      }
+
+      "invalid access code will return a forbidden" in forAll(
+        arbitrary[GuaranteeReferenceNumber],
+        arbitrary[AccessCode]
+      ) {
+        (grn, accessCode) =>
+          val acs = mock[AccessCodeService]
+          val brs = mock[BalanceRetrievalService]
+          val ces = mock[CountryExtractionService]
+
+          when(
+            acs.ensureAccessCodeValid(
+              GuaranteeReferenceNumber(eqTo(grn.value)),
+              AccessCode(eqTo(accessCode.value)),
+              any[CountryCode]
+            )(any(), any())
+          ).thenReturn(EitherT.leftT(AccessCodeError.InvalidAccessCode))
+
+          when(ces.extractCountry(GuaranteeReferenceNumber(eqTo(grn.value))))
+            .thenReturn(EitherT.rightT(CountryCode.Gb))
+
+          val sut    = new BalanceController(acs, brs, ces, stubControllerComponents(), PassthroughAuthProvider)
+          val result = sut.postBalance(grn)(FakeRequest("POST", "/", FakeHeaders(), requests.RouterBalanceRequest(accessCode)))
+
+          status(result) mustBe FORBIDDEN
+          contentAsJson(result) mustBe Json.obj("code" -> "FORBIDDEN", "message" -> "Access code did not match")
+      }
+
+      "invalid guarantee type will return a bad request" in forAll(
+        arbitrary[GuaranteeReferenceNumber],
+        arbitrary[AccessCode]
+      ) {
+        (grn, accessCode) =>
+          val acs = mock[AccessCodeService]
+          val brs = mock[BalanceRetrievalService]
+          val ces = mock[CountryExtractionService]
+
+          when(
+            acs.ensureAccessCodeValid(
+              GuaranteeReferenceNumber(eqTo(grn.value)),
+              AccessCode(eqTo(accessCode.value)),
+              any[CountryCode]
+            )(any(), any())
+          ).thenReturn(EitherT.leftT(AccessCodeError.InvalidGuaranteeType))
+
+          when(ces.extractCountry(GuaranteeReferenceNumber(eqTo(grn.value))))
+            .thenReturn(EitherT.rightT(CountryCode.Gb))
+
+          val sut    = new BalanceController(acs, brs, ces, stubControllerComponents(), PassthroughAuthProvider)
+          val result = sut.postBalance(grn)(FakeRequest("POST", "/", FakeHeaders(), requests.RouterBalanceRequest(accessCode)))
+
+          status(result) mustBe BAD_REQUEST
+          contentAsJson(result) mustBe Json.obj("code" -> "INVALID_GUARANTEE_TYPE", "message" -> "Guarantee type is not supported")
       }
 
       "backend failure will return a 500" in forAll(

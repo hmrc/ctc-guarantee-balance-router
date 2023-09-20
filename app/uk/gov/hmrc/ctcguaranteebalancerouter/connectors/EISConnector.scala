@@ -57,6 +57,7 @@ import java.util.UUID
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import scala.util.control.NonFatal
+import scala.util.matching.Regex
 
 trait EISConnector {
 
@@ -68,6 +69,10 @@ trait EISConnector {
     ec: ExecutionContext
   ): EitherT[Future, ConnectorError, BalanceResponse]
 
+}
+
+object EISConnectorImpl {
+  private lazy val invalidGrnPattern: Regex = ".*Guarantee not found for GRN.*".r
 }
 
 class EISConnectorImpl(
@@ -184,12 +189,11 @@ class EISConnectorImpl(
     }
 
   private def deriveErrorFromResponseMessage(response: EISResponse): ConnectorError =
-    (response.containsInvalidGRN, response.invalidAccessCode) match {
-      case (true, _) =>
-        ConnectorError.GrnNotFound
-      case (_, true) =>
-        ConnectorError.InvalidAccessCode
-      case _ => ConnectorError.Unexpected("Unexpected response from EIS", None)
+    response.message match {
+      case "Not Valid Access Code for this operation"    => ConnectorError.InvalidAccessCode
+      case "Not Valid Guarantee Type for this operation" => ConnectorError.InvalidGuaranteeType
+      case EISConnectorImpl.invalidGrnPattern()          => ConnectorError.GrnNotFound
+      case _                                             => ConnectorError.Unexpected("Unexpected response from EIS", None)
     }
 
   private def isFailure[A](either: Either[ConnectorError, A]): Boolean = either match {

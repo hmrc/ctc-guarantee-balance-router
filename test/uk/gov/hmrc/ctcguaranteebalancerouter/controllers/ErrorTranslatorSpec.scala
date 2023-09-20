@@ -71,19 +71,19 @@ class ErrorTranslatorSpec extends AnyFreeSpec with Matchers with OptionValues wi
 
   "BalanceRetrievalError error" - {
     "FailedToDeserialise error is an Internal Service Error" in {
-      balanceRetrievalErrorConveter.convert(BalanceRetrievalError.FailedToDeserialise) mustBe PresentationError.internalServiceError()
+      balanceRetrievalErrorConverter.convert(BalanceRetrievalError.FailedToDeserialise) mustBe PresentationError.internalServiceError()
     }
 
     "NotFound is a not found" in {
-      balanceRetrievalErrorConveter.convert(BalanceRetrievalError.GrnNotFound) mustBe PresentationError.notFoundError("GRN not found")
+      balanceRetrievalErrorConverter.convert(BalanceRetrievalError.GrnNotFound) mustBe PresentationError.notFoundError("GRN not found")
     }
 
     "Unexpected Error with no exception is an Internal Service Error" in {
-      balanceRetrievalErrorConveter.convert(BalanceRetrievalError.Unexpected("bleh", None)) mustBe PresentationError.internalServiceError()
+      balanceRetrievalErrorConverter.convert(BalanceRetrievalError.Unexpected("bleh", None)) mustBe PresentationError.internalServiceError()
     }
 
     "Unexpected Error with an exception is an Internal Service Error" in {
-      balanceRetrievalErrorConveter.convert(BalanceRetrievalError.Unexpected("bleh", Some(new IllegalStateException()))) mustBe PresentationError
+      balanceRetrievalErrorConverter.convert(BalanceRetrievalError.Unexpected("bleh", Some(new IllegalStateException()))) mustBe PresentationError
         .internalServiceError()
     }
   }
@@ -92,6 +92,16 @@ class ErrorTranslatorSpec extends AnyFreeSpec with Matchers with OptionValues wi
 
     "InvalidAccessCode is a forbidden" in {
       accessCodeErrorConverter.convert(AccessCodeError.InvalidAccessCode) mustBe PresentationError.forbiddenError("Access code did not match")
+    }
+
+    "InvalidGuaranteeType is a bad request with INVALID_GUARANTEE_TYPE code" in {
+      accessCodeErrorConverter.convert(AccessCodeError.InvalidGuaranteeType) mustBe PresentationError.invalidGuaranteeTypeError(
+        "Guarantee type is not supported"
+      )
+    }
+
+    "GrnNotFound is not found" in {
+      accessCodeErrorConverter.convert(AccessCodeError.GrnNotFound) mustBe PresentationError.notFoundError("GRN not found")
     }
 
     "FailedToDeserialise error is an Internal Service Error" in {

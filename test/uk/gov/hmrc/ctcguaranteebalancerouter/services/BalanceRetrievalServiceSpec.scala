@@ -27,9 +27,7 @@ import org.scalatest.time.SpanSugar.convertIntToGrainOfTime
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 import uk.gov.hmrc.ctcguaranteebalancerouter.connectors.EISConnector
 import uk.gov.hmrc.ctcguaranteebalancerouter.fakes.connectors.FakeEISConnectorProvider
-import uk.gov.hmrc.ctcguaranteebalancerouter.models.Balance
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.CountryCode
-import uk.gov.hmrc.ctcguaranteebalancerouter.models.CurrencyCL
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.GuaranteeReferenceNumber
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.errors.BalanceRetrievalError
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.errors.ConnectorError

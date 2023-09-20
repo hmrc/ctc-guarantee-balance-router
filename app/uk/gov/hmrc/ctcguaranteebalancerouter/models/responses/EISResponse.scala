@@ -17,12 +17,10 @@
 package uk.gov.hmrc.ctcguaranteebalancerouter.models.responses
 
 import play.api.libs.json.Json
+import play.api.libs.json.OFormat
 
-case class EISResponse(message: String, timestamp: String, path: String) {
-  def invalidAccessCode  = message == "Not Valid Access Code for this operation"
-  def containsInvalidGRN = message.contains("Guarantee not found for GRN")
-}
+case class EISResponse(message: String, timestamp: String, path: String)
 
 object EISResponse {
-  implicit val format = Json.format[EISResponse]
+  implicit val format: OFormat[EISResponse] = Json.format[EISResponse]
 }

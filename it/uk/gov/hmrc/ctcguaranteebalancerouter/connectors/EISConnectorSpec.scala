@@ -174,6 +174,9 @@ class EISConnectorSpec
   val invalidAccessCodeResponseBody =
     Json.stringify(Json.obj("message" -> "Not Valid Access Code for this operation", "timestamp" -> OffsetDateTime.now().toString, "path" -> "..."))
 
+  val invalidGuaranteeTypeResponseBody =
+    Json.stringify(Json.obj("message" -> "Not Valid Guarantee Type for this operation", "timestamp" -> OffsetDateTime.now().toString, "path" -> "..."))
+
   def grnNotFoundResponseBody(grn: GuaranteeReferenceNumber) =
     Json.stringify(Json.obj("message" -> s"Guarantee not found for GRN: ${grn.value}", "timestamp" -> OffsetDateTime.now().toString, "path" -> "..."))
 
@@ -327,6 +330,33 @@ class EISConnectorSpec
         whenReady(connector().postAccessCodeRequest(grn, AccessCode("ABCD"), hc).value) {
           case Left(ConnectorError.GrnNotFound) => verify(loggerMock, times(1)).error(anyString())(any())
           case x                                => fail(s"Left was not a ConnectorError.GrnNotFound (got $x)")
+        }
+    }
+
+    "Invalid guarantee type response from EIS is correctly deserialised as ConnectorError.InvalidGuaranteeType" in forAll(
+      connectorGen
+    ) {
+      connector =>
+        afterEach()
+        val grn = GuaranteeReferenceNumber("abc")
+        server.resetAll() // Need to reset due to the forAll - it's technically the same test
+
+        server.stubFor(
+          post(
+            urlEqualTo(accessCodeUri(grn))
+          ).withHeader("Authorization", equalTo("Bearer bearertokenhereGB"))
+            .withHeader("Date", equalTo("Wed, 23 Aug 2023 12:39:31 UTC"))
+            .withHeader(HeaderNames.ACCEPT, equalTo("application/json"))
+            .withHeader(HeaderNames.CONTENT_TYPE, equalTo("application/json"))
+            .withHeader("X-Correlation-Id", matching(RegexPatterns.UUID))
+            .willReturn(aResponse().withStatus(FORBIDDEN).withBody(invalidGuaranteeTypeResponseBody))
+        )
+
+        val hc = HeaderCarrier()
+
+        whenReady(connector().postAccessCodeRequest(grn, AccessCode("ABCD"), hc).value) {
+          case Left(ConnectorError.InvalidGuaranteeType) => verify(loggerMock, times(1)).error(anyString())(any())
+          case x                                         => fail(s"Left was not a ConnectorError.InvalidGuaranteeType (got $x)")
         }
     }
 
