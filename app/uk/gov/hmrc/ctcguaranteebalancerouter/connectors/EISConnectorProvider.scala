@@ -16,10 +16,10 @@
 
 package uk.gov.hmrc.ctcguaranteebalancerouter.connectors
 
-import akka.stream.Materializer
+import org.apache.pekko.stream.Materializer
 import com.google.inject.ImplementedBy
 import com.google.inject.Inject
-import com.kenshoo.play.metrics.Metrics
+import uk.gov.hmrc.play.bootstrap.metrics.Metrics
 import uk.gov.hmrc.ctcguaranteebalancerouter.config.AppConfig
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.CountryCode
 import uk.gov.hmrc.http.client.HttpClientV2
