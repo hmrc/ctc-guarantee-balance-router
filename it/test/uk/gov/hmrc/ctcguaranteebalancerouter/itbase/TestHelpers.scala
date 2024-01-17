@@ -16,11 +16,20 @@
 
 package uk.gov.hmrc.ctcguaranteebalancerouter.itbase
 
-import com.codahale.metrics.MetricRegistry
-import uk.gov.hmrc.play.bootstrap.metrics.Metrics
+import play.api.inject.guice.GuiceApplicationBuilder
+import uk.gov.hmrc.http.HeaderCarrier
 
-class TestMetrics extends Metrics {
-  override def defaultRegistry: MetricRegistry = new MetricRegistry()
+object TestHelpers {
 
-  override def toJson: String = "{}"
+  lazy val headerCarrierConfig: HeaderCarrier.Config =
+    HeaderCarrier.Config.fromConfig(
+      GuiceApplicationBuilder()
+        .configure(
+          "metrics.jvm" -> false
+        )
+        .build()
+        .configuration
+        .underlying
+    )
+
 }
