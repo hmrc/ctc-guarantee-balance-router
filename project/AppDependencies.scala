@@ -10,9 +10,8 @@ object AppDependencies {
   private val bootstrapVersion = "8.4.0"
 
   val compile = Seq(
-    "uk.gov.hmrc"  %% "bootstrap-backend-play-30" % bootstrapVersion,
-    "io.lemonlabs" %% "scala-uri"                 % "3.6.0",
-//    "io.lemonlabs"     %% "scala-uri"                    % "4.0.3",
+    "uk.gov.hmrc"      %% "bootstrap-backend-play-30"    % bootstrapVersion,
+    "io.lemonlabs"     %% "scala-uri"                    % "4.0.3",
     "org.typelevel"    %% "cats-core"                    % catsVersion,
     "com.github.cb372" %% "cats-retry"                   % catsRetryVersion,
     "com.github.cb372" %% "alleycats-retry"              % catsRetryVersion,
@@ -20,11 +19,9 @@ object AppDependencies {
   )
 
   val test = Seq(
-//    "org.scalatest"     %% "scalatest"               % "3.2.14",
     "org.scalatestplus" %% "scalacheck-1-17"         % "3.2.17.0",
     "uk.gov.hmrc"       %% "bootstrap-test-play-30"  % bootstrapVersion,
     "org.mockito"       %% "mockito-scala-scalatest" % "1.17.14",
-    "org.mockito"        % "mockito-core"            % "3.12.4"
-//    "org.mockito"        % "mockito-core"            % "5.9.0"
+    "org.mockito"        % "mockito-core"            % "5.9.0"
   ).map(_ % Test)
 }
