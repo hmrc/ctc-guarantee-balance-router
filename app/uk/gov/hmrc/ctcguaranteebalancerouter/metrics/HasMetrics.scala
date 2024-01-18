@@ -17,7 +17,7 @@
 package uk.gov.hmrc.ctcguaranteebalancerouter.metrics
 
 import com.codahale.metrics.MetricRegistry
-import com.kenshoo.play.metrics.Metrics
+import uk.gov.hmrc.play.bootstrap.metrics.Metrics
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.errors.ConnectorError
 
 import java.util.concurrent.atomic.AtomicBoolean

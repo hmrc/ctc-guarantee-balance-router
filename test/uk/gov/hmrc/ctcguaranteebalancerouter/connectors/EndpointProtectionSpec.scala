@@ -16,7 +16,7 @@
 
 package uk.gov.hmrc.ctcguaranteebalancerouter.connectors
 
-import akka.stream.Materializer
+import org.apache.pekko.stream.Materializer
 import org.mockito.MockitoSugar
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.freespec.AnyFreeSpec

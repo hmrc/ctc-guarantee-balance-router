@@ -16,9 +16,9 @@
 
 package uk.gov.hmrc.ctcguaranteebalancerouter.connectors
 
-import akka.stream.Materializer
+import org.apache.pekko.stream.Materializer
 import cats.data.EitherT
-import com.kenshoo.play.metrics.Metrics
+import uk.gov.hmrc.play.bootstrap.metrics.Metrics
 import play.api.Logging
 import play.api.http.HeaderNames
 import play.api.http.MimeTypes

@@ -16,12 +16,15 @@
 
 package uk.gov.hmrc.ctcguaranteebalancerouter.itbase
 
-import play.api.inject.guice.GuiceApplicationBuilder
-import uk.gov.hmrc.http.HeaderCarrier
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.stream.Materializer
+import org.scalatest.Suite
 
-object TestHelpers {
+object TestActorSystem {
+  val system: ActorSystem = ActorSystem("test")
+}
 
-  lazy val headerCarrierConfig: HeaderCarrier.Config =
-    HeaderCarrier.Config.fromConfig(GuiceApplicationBuilder().build().configuration.underlying)
-
+trait TestActorSystem { self: Suite =>
+  implicit val system: ActorSystem        = TestActorSystem.system
+  implicit val materializer: Materializer = Materializer(TestActorSystem.system)
 }
