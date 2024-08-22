@@ -34,15 +34,9 @@ class FakeRequestBuilder extends RequestBuilder {
 
   override def stream[A](implicit evidence$2: StreamHttpReads[A], ec: ExecutionContext): Future[A] = Future.failed(new RuntimeException)
 
-  def replaceHeader(header: (String, String)): RequestBuilder = this
-
-  def addHeaders(headers: (String, String)*): RequestBuilder = this
-
   override def withProxy: RequestBuilder = this
 
   override def setHeader(header: (String, String)*): RequestBuilder = this
-
-  def withBody[B: BodyWritable: universe.TypeTag](body: B)(implicit ec: ExecutionContext): RequestBuilder = this
 
   override def withBody[B: BodyWritable: Tag](body: B)(implicit ec: ExecutionContext): RequestBuilder = this
 }
