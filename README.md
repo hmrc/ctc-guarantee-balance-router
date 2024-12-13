@@ -9,7 +9,7 @@ instead.
 ## Prerequisites
 
 - Scala 2.13.12
-- Java 11
+- Java 21
 - sbt 1.9.7
 - [Service Manager](https://github.com/hmrc/service-manager)
 
