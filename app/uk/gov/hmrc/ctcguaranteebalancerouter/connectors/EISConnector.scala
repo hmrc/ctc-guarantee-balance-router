@@ -42,6 +42,7 @@ import uk.gov.hmrc.ctcguaranteebalancerouter.models.responses.BalanceResponse
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.responses.EISResponse
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.http.HttpReads.Implicits._
+import play.api.libs.ws.JsonBodyWritables._
 import uk.gov.hmrc.http.HttpResponse
 import uk.gov.hmrc.http.StringContextOps
 import uk.gov.hmrc.http.client.HttpClientV2
@@ -146,7 +147,7 @@ class EISConnectorImpl(
           call(headerCarrier)
             .execute[HttpResponse]
             .map[Either[ConnectorError, A]] {
-              response: HttpResponse =>
+              response =>
                 response.status match {
                   case FORBIDDEN =>
                     logger.error(

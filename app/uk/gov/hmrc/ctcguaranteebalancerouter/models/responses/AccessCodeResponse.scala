@@ -17,11 +17,12 @@
 package uk.gov.hmrc.ctcguaranteebalancerouter.models.responses
 
 import play.api.libs.json.Json
+import play.api.libs.json.OFormat
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.AccessCode
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.GuaranteeReferenceNumber
 
 object AccessCodeResponse {
-  implicit val accessCodeResponseFormat = Json.format[AccessCodeResponse]
+  implicit val accessCodeResponseFormat: OFormat[AccessCodeResponse] = Json.format[AccessCodeResponse]
 }
 
 case class AccessCodeResponse(grn: GuaranteeReferenceNumber, masterAccessCode: AccessCode, additionalAccessCodes: List[AccessCode])

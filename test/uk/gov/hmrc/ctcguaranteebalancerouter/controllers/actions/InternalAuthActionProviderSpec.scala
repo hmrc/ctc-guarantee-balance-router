@@ -16,14 +16,19 @@
 
 package uk.gov.hmrc.ctcguaranteebalancerouter.controllers.actions
 
-import org.mockito.ArgumentMatchers.any
-import org.mockito.ArgumentMatchers.{eq => eqTo}
-import org.mockito.MockitoSugar
+import org.mockito.ArgumentMatchers.eq as eqTo
+import org.mockito.ArgumentMatchers.eq as eqTo
+import org.mockito.Mockito.times
+import org.mockito.Mockito.verify
+import org.mockito.Mockito.when
+import org.scalatestplus.mockito.MockitoSugar
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.must.Matchers
 import play.api.mvc.ActionBuilder
 import play.api.mvc.AnyContent
+import play.api.mvc.ControllerComponents
 import play.api.mvc.DefaultActionBuilder
+import play.api.mvc.Request
 import play.api.test.Helpers.stubControllerComponents
 import uk.gov.hmrc.ctcguaranteebalancerouter.config.AppConfig
 import uk.gov.hmrc.internalauth.client.AuthenticatedRequest
@@ -34,7 +39,9 @@ import uk.gov.hmrc.internalauth.client.Resource
 import uk.gov.hmrc.internalauth.client.ResourceLocation
 import uk.gov.hmrc.internalauth.client.ResourceType
 import uk.gov.hmrc.internalauth.client.Retrieval.EmptyRetrieval
+import org.mockito.ArgumentMatchers.{any => anyArg}
 
+import scala.compiletime.ops.any
 import scala.concurrent.ExecutionContext.Implicits.global
 
 class InternalAuthActionProviderSpec extends AnyFreeSpec with Matchers with MockitoSugar {
@@ -50,14 +57,25 @@ class InternalAuthActionProviderSpec extends AnyFreeSpec with Matchers with Mock
         val appConfig = mock[AppConfig]
         when(appConfig.internalAuthEnabled).thenReturn(false)
 
-        val mockActionBuilder         = mock[ActionBuilder[AuthReq, AnyContent]]
         val mockBackendAuthComponents = mock[BackendAuthComponents]
-        when(mockBackendAuthComponents.authorizedAction(any[Predicate], eqTo(EmptyRetrieval), any(), any())).thenReturn(mockActionBuilder)
 
         val samplePermission = Predicate.Permission(Resource(ResourceType("ctc-guarantee-balance-router"), ResourceLocation("balance")), IAAction("READ"))
-        val sut              = new InternalAuthActionProviderImpl(appConfig, mockBackendAuthComponents, stubControllerComponents())
+        val _                = new InternalAuthActionProviderImpl(appConfig, mockBackendAuthComponents, stubControllerComponents())
+        verify(mockBackendAuthComponents, times(0)).authorizedAction(samplePermission)
+      }
 
-        sut(samplePermission) mustBe a[DefaultActionBuilder]
+      "should return DefaultActionBuilder" in {
+        val appConfig = mock[AppConfig]
+        when(appConfig.internalAuthEnabled).thenReturn(false)
+
+        val backendAuthComponents    = mock[BackendAuthComponents]
+        val cc: ControllerComponents = stubControllerComponents()
+
+        val provider       = new InternalAuthActionProviderImpl(appConfig, backendAuthComponents, cc)
+        val dummyPredicate = mock[Predicate]
+        val actionBuilder  = provider(dummyPredicate)
+
+        actionBuilder mustBe a[DefaultActionBuilder]
       }
 
     }
@@ -69,17 +87,14 @@ class InternalAuthActionProviderSpec extends AnyFreeSpec with Matchers with Mock
         val appConfig = mock[AppConfig]
         when(appConfig.internalAuthEnabled).thenReturn(true)
 
-        val mockActionBuilder         = mock[ActionBuilder[AuthReq, AnyContent]]
         val mockBackendAuthComponents = mock[BackendAuthComponents]
-        when(mockBackendAuthComponents.authorizedAction(any[Predicate], eqTo(EmptyRetrieval), any(), any())).thenReturn(mockActionBuilder)
 
         val samplePermission = Predicate.Permission(Resource(ResourceType("ctc-guarantee-balance-router"), ResourceLocation("balance")), IAAction("READ"))
-        val sut              = new InternalAuthActionProviderImpl(appConfig, mockBackendAuthComponents, stubControllerComponents())
-
-        sut(samplePermission) mustBe mockActionBuilder
+        val _                = new InternalAuthActionProviderImpl(appConfig, mockBackendAuthComponents, stubControllerComponents()).apply(samplePermission)
+        verify(mockBackendAuthComponents, times(1)).authorizedAction(samplePermission)
       }
 
     }
-  }
 
+  }
 }

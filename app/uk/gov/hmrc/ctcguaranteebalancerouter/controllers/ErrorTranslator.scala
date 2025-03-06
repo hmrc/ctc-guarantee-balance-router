@@ -37,7 +37,7 @@ trait ErrorTranslator {
     def convert(input: E): PresentationError
   }
 
-  implicit val accessCodeErrorConverter = new Converter[AccessCodeError] {
+  implicit val accessCodeErrorConverter: Converter[AccessCodeError] = new Converter[AccessCodeError] {
 
     override def convert(error: AccessCodeError): PresentationError = error match {
       case AccessCodeError.GrnNotFound          => PresentationError.notFoundError("GRN not found")
@@ -48,7 +48,7 @@ trait ErrorTranslator {
     }
   }
 
-  implicit val balanceRetrievalErrorConverter = new Converter[BalanceRetrievalError] {
+  implicit val balanceRetrievalErrorConverter: Converter[BalanceRetrievalError] = new Converter[BalanceRetrievalError] {
 
     override def convert(input: BalanceRetrievalError): PresentationError = input match {
       case BalanceRetrievalError.GrnNotFound         => PresentationError.notFoundError("GRN not found")
@@ -57,7 +57,7 @@ trait ErrorTranslator {
     }
   }
 
-  implicit val countryExtractionErrorConverter = new Converter[CountryExtractionError] {
+  implicit val countryExtractionErrorConverter: Converter[CountryExtractionError] = new Converter[CountryExtractionError] {
 
     override def convert(input: CountryExtractionError): PresentationError = input match {
       case CountryExtractionError.InvalidCountryCode(code) => PresentationError.badRequestError(s"GRN was provided for $code, this is not a GB or XI guarantee")

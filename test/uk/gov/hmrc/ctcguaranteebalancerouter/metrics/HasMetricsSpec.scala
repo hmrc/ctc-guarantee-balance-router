@@ -24,7 +24,7 @@ import uk.gov.hmrc.play.bootstrap.metrics.Metrics
 import org.mockito.ArgumentMatchers._
 import org.mockito.Mockito
 import org.mockito.Mockito._
-import org.mockito.scalatest.MockitoSugar
+import org.scalatestplus.mockito.MockitoSugar
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.OptionValues
 import org.scalatest.compatible.Assertion
@@ -105,8 +105,8 @@ class HasMetricsSpec extends AsyncWordSpecLike with Matchers with OptionValues w
               Future.successful(Left(ConnectorError.Unexpected("oops", None)))
             )
             .map {
-              _: Any =>
-                verifyCompletedWithSuccess(TestMetric, metrics)
+              (_: Any) =>
+                verifyCompletedWithFailure(TestMetric, metrics)
             }
       }
 
@@ -126,13 +126,16 @@ class HasMetricsSpec extends AsyncWordSpecLike with Matchers with OptionValues w
             }
       }
 
-      "increment failure counter when the user throws an exception constructing their code block" in withTestMetrics {
+      "should increment failure counter when the user throws an exception constructing their code block" in withTestMetrics {
         metrics =>
-          metrics.withMetricsTimerResponse[Any](TestMetric) {
-            Future.successful(Left(ConnectorError.Unexpected("oops", Some(new RuntimeException))))
-          }
-
-          Future.successful(verifyCompletedWithFailure(TestMetric, metrics))
+          metrics
+            .withMetricsTimerResponse[Any](TestMetric) {
+              Future.successful(Left(ConnectorError.Unexpected("oops", Some(new RuntimeException))))
+            }
+            .map {
+              _ =>
+                verifyCompletedWithFailure(TestMetric, metrics)
+            }
       }
 
       "increment failure counter an exception is thrown" in withTestMetrics {

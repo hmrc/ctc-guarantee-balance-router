@@ -16,11 +16,12 @@
 
 package uk.gov.hmrc.ctcguaranteebalancerouter.models.requests
 
+import play.api.libs.json.Format
 import play.api.libs.json.Json
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.AccessCode
 
 case class AccessCodeRequest(masterAccessCode: AccessCode)
 
 object AccessCodeRequest {
-  implicit val format = Json.format[AccessCodeRequest]
+  implicit val format: Format[AccessCodeRequest] = Json.format[AccessCodeRequest]
 }

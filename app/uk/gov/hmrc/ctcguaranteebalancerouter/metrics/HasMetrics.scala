@@ -49,13 +49,16 @@ trait HasMetrics {
       }
   }
 
-  /** Execute a block of code with a metrics timer.
-    * Intended for use in controllers that return HTTP responses.
+  /** Execute a block of code with a metrics timer. Intended for use in controllers that return HTTP responses.
     *
-    * @param metric The id of the metric to be collected
-    * @param block The block of code to execute asynchronously
-    * @param ec The [[scala.concurrent.ExecutionContext]] on which the block of code should run
-    * @return The result of the block of code
+    * @param metric
+    *   The id of the metric to be collected
+    * @param block
+    *   The block of code to execute asynchronously
+    * @param ec
+    *   The [[scala.concurrent.ExecutionContext]] on which the block of code should run
+    * @return
+    *   The result of the block of code
     */
   def withMetricsTimerResponse[A](
     metricKey: String

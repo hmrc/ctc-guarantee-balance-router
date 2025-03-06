@@ -18,7 +18,9 @@ package uk.gov.hmrc.ctcguaranteebalancerouter.services
 
 import cats.data.EitherT
 import org.mockito.ArgumentMatchers.any
-import org.mockito.MockitoSugar
+import org.mockito.ArgumentMatchers.eq as eqTo
+import org.mockito.Mockito.when
+import org.scalatestplus.mockito.MockitoSugar
 import org.scalacheck.Arbitrary.arbitrary
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.freespec.AnyFreeSpec
@@ -37,6 +39,7 @@ import uk.gov.hmrc.ctcguaranteebalancerouter.utils.Generators
 import uk.gov.hmrc.http.HeaderCarrier
 
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
 
 class AccessCodeServiceSpec extends AnyFreeSpec with Matchers with ScalaCheckDrivenPropertyChecks with MockitoSugar with ScalaFutures with Generators {
 
@@ -55,7 +58,7 @@ class AccessCodeServiceSpec extends AnyFreeSpec with Matchers with ScalaCheckDri
       (grn, accessCode, accessCodeList, countryCode) =>
         val mockConnector = mock[EISConnector]
         when(mockConnector.postAccessCodeRequest(GuaranteeReferenceNumber(any()), AccessCode(any()), any())(any()))
-          .thenReturn(EitherT.rightT(AccessCodeResponse(grn, accessCode, accessCodeList)))
+          .thenReturn(EitherT.rightT[Future, ConnectorError](AccessCodeResponse(grn, accessCode, accessCodeList)))
 
         val sut = new AccessCodeServiceImpl(FakeEISConnectorProvider(mockConnector, mockConnector))
 
@@ -72,7 +75,7 @@ class AccessCodeServiceSpec extends AnyFreeSpec with Matchers with ScalaCheckDri
       (grn, accessCode, countryCode) =>
         val mockConnector = mock[EISConnector]
         when(mockConnector.postAccessCodeRequest(GuaranteeReferenceNumber(any()), AccessCode(any()), any())(any()))
-          .thenReturn(EitherT.leftT(ConnectorError.InvalidAccessCode))
+          .thenReturn(EitherT.leftT[Future, AccessCodeResponse](ConnectorError.InvalidAccessCode))
 
         val sut = new AccessCodeServiceImpl(FakeEISConnectorProvider(mockConnector, mockConnector))
 
@@ -89,12 +92,29 @@ class AccessCodeServiceSpec extends AnyFreeSpec with Matchers with ScalaCheckDri
       (grn, accessCode, countryCode) =>
         val mockConnector = mock[EISConnector]
         when(mockConnector.postAccessCodeRequest(GuaranteeReferenceNumber(any()), AccessCode(any()), any())(any()))
-          .thenReturn(EitherT.leftT(ConnectorError.InvalidGuaranteeType))
+          .thenReturn(EitherT.leftT[Future, AccessCodeResponse](ConnectorError.InvalidGuaranteeType))
 
         val sut = new AccessCodeServiceImpl(FakeEISConnectorProvider(mockConnector, mockConnector))
 
         whenReady(sut.ensureAccessCodeValid(grn, accessCode, countryCode).value, Timeout(1.second)) {
           _ mustBe Left(AccessCodeError.InvalidGuaranteeType)
+        }
+    }
+
+    "on invalid guarantee type, return a Left of AccessCodeError.GrnNotFound" in forAll(
+      arbitrary[GuaranteeReferenceNumber],
+      arbitrary[AccessCode],
+      arbitrary[CountryCode]
+    ) {
+      (grn, accessCode, countryCode) =>
+        val mockConnector = mock[EISConnector]
+        when(mockConnector.postAccessCodeRequest(GuaranteeReferenceNumber(any()), AccessCode(any()), any())(any()))
+          .thenReturn(EitherT.leftT[Future, AccessCodeResponse](ConnectorError.GrnNotFound))
+
+        val sut = new AccessCodeServiceImpl(FakeEISConnectorProvider(mockConnector, mockConnector))
+
+        whenReady(sut.ensureAccessCodeValid(grn, accessCode, countryCode).value, Timeout(1.second)) {
+          _ mustBe Left(AccessCodeError.GrnNotFound)
         }
     }
 
@@ -106,7 +126,7 @@ class AccessCodeServiceSpec extends AnyFreeSpec with Matchers with ScalaCheckDri
       (grn, accessCode, countryCode) =>
         val mockConnector = mock[EISConnector]
         when(mockConnector.postAccessCodeRequest(GuaranteeReferenceNumber(any()), AccessCode(any()), any())(any()))
-          .thenReturn(EitherT.leftT(ConnectorError.FailedToDeserialise))
+          .thenReturn(EitherT.leftT[Future, AccessCodeResponse](ConnectorError.FailedToDeserialise))
 
         val sut = new AccessCodeServiceImpl(FakeEISConnectorProvider(mockConnector, mockConnector))
 
@@ -124,7 +144,8 @@ class AccessCodeServiceSpec extends AnyFreeSpec with Matchers with ScalaCheckDri
         val exception     = new IllegalStateException()
         val error         = ConnectorError.Unexpected("oops", Some(exception))
         val mockConnector = mock[EISConnector]
-        when(mockConnector.postAccessCodeRequest(GuaranteeReferenceNumber(any()), AccessCode(any()), any())(any())).thenReturn(EitherT.leftT(error))
+        when(mockConnector.postAccessCodeRequest(GuaranteeReferenceNumber(any()), AccessCode(any()), any())(any()))
+          .thenReturn(EitherT.leftT[Future, AccessCodeResponse](error))
 
         val sut = new AccessCodeServiceImpl(FakeEISConnectorProvider(mockConnector, mockConnector))
 

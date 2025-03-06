@@ -17,10 +17,11 @@
 package uk.gov.hmrc.ctcguaranteebalancerouter.models.requests
 
 import play.api.libs.json.Json
+import play.api.libs.json.OFormat
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.AccessCode
 
 object RouterBalanceRequest {
-  implicit val routerBalanceRequestFormat = Json.format[RouterBalanceRequest]
+  implicit val routerBalanceRequestFormat: OFormat[RouterBalanceRequest] = Json.format[RouterBalanceRequest]
 }
 
 case class RouterBalanceRequest(accessCode: AccessCode)
