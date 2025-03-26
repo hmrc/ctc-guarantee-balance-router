@@ -10,12 +10,18 @@ object CodeCoverageSettings {
     "app.*",
     "prod.*",
     ".*Routes.*",
+    ".*models.*",
     "testOnly.*",
     "testOnlyDoNotUseInAppConf.*"
   )
 
+  private val excludedFiles: Seq[String] = Seq(
+    ".*EndpointProtection.*"
+  )
+
   val settings: Seq[Setting[_]] = Seq(
     ScoverageKeys.coverageExcludedPackages := excludedPackages.mkString(";"),
+    ScoverageKeys.coverageExcludedFiles := excludedFiles.mkString(";"),
     ScoverageKeys.coverageMinimumStmtTotal := 90,
     ScoverageKeys.coverageFailOnMinimum := true,
     ScoverageKeys.coverageHighlighting := true

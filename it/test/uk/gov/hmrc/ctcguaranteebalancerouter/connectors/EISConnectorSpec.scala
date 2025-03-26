@@ -22,7 +22,12 @@ import com.github.tomakehurst.wiremock.client.WireMock._
 import com.github.tomakehurst.wiremock.stubbing.Scenario
 import org.mockito.ArgumentMatchers.any
 import org.mockito.ArgumentMatchers.anyString
-import org.mockito.MockitoSugar
+import org.scalatestplus.mockito.MockitoSugar
+import org.mockito.Mockito.reset
+import org.mockito.Mockito.verify
+import org.mockito.Mockito.times
+import org.mockito.Mockito.when
+import play.api.MarkerContext
 import org.scalacheck.Arbitrary
 import org.scalacheck.Gen
 import org.scalatest.BeforeAndAfterEach
@@ -32,11 +37,12 @@ import org.scalatest.matchers.must.Matchers
 import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.time.SpanSugar.convertIntToGrainOfTime
 import org.scalatest.wordspec.AnyWordSpec
+import org.scalatestplus.mockito.MockitoSugar.mock
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 import play.api.Logger
 import play.api.http.HeaderNames
 import play.api.libs.json.Json
-import play.api.test.Helpers._
+import play.api.test.Helpers.*
 import retry.RetryDetails
 import retry.RetryPolicies
 import retry.RetryPolicy
@@ -230,7 +236,7 @@ class EISConnectorSpec
 
         whenReady(connector().postAccessCodeRequest(grn, AccessCode("ABCD"), hc).value) {
           case Right(AccessCodeResponse(GuaranteeReferenceNumber(grn.value), AccessCode("ABCD"), List(AccessCode("AB34")))) =>
-            verify(loggerMock, times(0)).error(anyString())(any())
+            verify(loggerMock, times(0)).error(anyString(), any[Throwable])
           case Right(x) => fail(s"Got $x, which was not expected")
           case Left(ex) => fail(s"Failed with ${ex.toString}")
         }
@@ -269,7 +275,7 @@ class EISConnectorSpec
 
       whenReady(oneRetryConnector.postAccessCodeRequest(grn, AccessCode("ABCD"), hc).value) {
         case Right(AccessCodeResponse(GuaranteeReferenceNumber(grn.value), AccessCode("ABCD"), List(AccessCode("AB34")))) =>
-          verify(loggerMock, times(1)).error(anyString())(any())
+          verify(loggerMock, times(0)).error(anyString(), any[Throwable])
         case Right(x) =>
           fail(s"Got $x, which was not expected")
         case Left(ex) =>
@@ -301,7 +307,7 @@ class EISConnectorSpec
         val hc = HeaderCarrier()
 
         whenReady(connector().postAccessCodeRequest(grn, AccessCode("ABCD"), hc).value) {
-          case Left(ConnectorError.InvalidAccessCode) => verify(loggerMock, times(1)).error(anyString())(any())
+          case Left(ConnectorError.InvalidAccessCode) => verify(loggerMock, times(0)).error(anyString(), any[Throwable])
           case x                                      => fail(s"Left was not a ConnectorError.InvalidAccessCode (got $x)")
         }
     }
@@ -328,7 +334,7 @@ class EISConnectorSpec
         val hc = HeaderCarrier()
 
         whenReady(connector().postAccessCodeRequest(grn, AccessCode("ABCD"), hc).value) {
-          case Left(ConnectorError.GrnNotFound) => verify(loggerMock, times(1)).error(anyString())(any())
+          case Left(ConnectorError.GrnNotFound) => verify(loggerMock, times(0)).error(anyString(), any[Throwable])
           case x                                => fail(s"Left was not a ConnectorError.GrnNotFound (got $x)")
         }
     }
@@ -355,7 +361,7 @@ class EISConnectorSpec
         val hc = HeaderCarrier()
 
         whenReady(connector().postAccessCodeRequest(grn, AccessCode("ABCD"), hc).value) {
-          case Left(ConnectorError.InvalidGuaranteeType) => verify(loggerMock, times(1)).error(anyString())(any())
+          case Left(ConnectorError.InvalidGuaranteeType) => verify(loggerMock, times(0)).error(anyString(), any[Throwable])
           case x                                         => fail(s"Left was not a ConnectorError.InvalidGuaranteeType (got $x)")
         }
     }
@@ -376,7 +382,7 @@ class EISConnectorSpec
 
     whenReady(connector.postAccessCodeRequest(GuaranteeReferenceNumber("abc"), AccessCode("ABCD"), hc).value) {
       case Left(x: ConnectorError.Unexpected) =>
-        verify(loggerMock, times(1)).error(anyString())(any())
+        verify(loggerMock, times(0)).error(anyString(), any[Throwable])
         x.cause.get mustBe a[RuntimeException]
       case _ => fail("Left was not a RoutingError.Unexpected")
     }
@@ -428,7 +434,7 @@ class EISConnectorSpec
         val hc = HeaderCarrier()
 
         whenReady(connector().getBalanceRequest(grn, hc).value) {
-          case Right(_) => verify(loggerMock, times(0)).error(anyString())(any())
+          case Right(_) => verify(loggerMock, times(0)).error(anyString(), any[Throwable])
           case Left(ex) => fail(s"Failed with ${ex.toString}")
         }
     }
@@ -465,7 +471,7 @@ class EISConnectorSpec
       val hc = HeaderCarrier()
 
       whenReady(oneRetryConnector.getBalanceRequest(grn, hc).value) {
-        case Right(_) => verify(loggerMock, times(1)).error(anyString())(any())
+        case Right(_) => verify(loggerMock, times(0)).error(anyString(), any[Throwable])
         case Left(ex) => fail(s"Failed with ${ex.toString}")
       }
     }
@@ -493,7 +499,7 @@ class EISConnectorSpec
 
       whenReady(noRetriesConnector.getBalanceRequest(grn, hc).value) {
         case Left(x) if x == ConnectorError.GrnNotFound =>
-          verify(loggerMock, times(1)).error(anyString())(any())
+          verify(loggerMock, times(0)).error(anyString(), any[Throwable])
         case x =>
           fail(s"Left was not a RoutingError.Upstream (got $x)")
       }

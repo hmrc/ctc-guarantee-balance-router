@@ -16,30 +16,52 @@
 
 package uk.gov.hmrc.ctcguaranteebalancerouter.connectors
 
-import org.mockito.MockitoSugar
-import org.scalatest.concurrent.ScalaFutures
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.stream.Materializer
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.must.Matchers
-import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
+import org.scalatestplus.mockito.MockitoSugar
+import org.scalatest.concurrent.ScalaFutures
+import uk.gov.hmrc.ctcguaranteebalancerouter.config.AppConfig
+import uk.gov.hmrc.ctcguaranteebalancerouter.config.EISInstanceConfig
 import uk.gov.hmrc.ctcguaranteebalancerouter.models.CountryCode
-import uk.gov.hmrc.ctcguaranteebalancerouter.utils.Generators
+import uk.gov.hmrc.http.client.HttpClientV2
 
-class EISConnectorProviderSpec extends AnyFreeSpec with Matchers with MockitoSugar with ScalaCheckDrivenPropertyChecks with ScalaFutures with Generators {
+import java.time.Clock
+import org.mockito.Mockito.when
+import uk.gov.hmrc.play.bootstrap.metrics.Metrics
 
-  object Harness extends EISConnectorProvider {
-    override val gb: EISConnector = mock[EISConnector]
+class EISConnectorProviderImplSpec extends AnyFreeSpec with Matchers with MockitoSugar with ScalaFutures {
 
-    override val xi: EISConnector = mock[EISConnector]
-  }
+  implicit val system: ActorSystem        = ActorSystem("TestSystem")
+  implicit val materializer: Materializer = Materializer(system)
 
-  "EISConnectorProvider#apply" - {
-    "retrieves the GB connector for country code Gb" in {
-      Harness(CountryCode.Gb) mustBe Harness.gb
+  "EISConnectorProviderImpl" - {
+    "should return the same connector instance on multiple invocations and distinct connectors for different country codes" in {
+      val appConfig     = mock[AppConfig]
+      val dummyGbConfig = mock[EISInstanceConfig]
+      val dummyXiConfig = mock[EISInstanceConfig]
+      when(appConfig.eisGbConfig).thenReturn(dummyGbConfig)
+      when(appConfig.eisXiConfig).thenReturn(dummyXiConfig)
+
+      when(appConfig.eisGbConfig).thenReturn(dummyGbConfig)
+      when(appConfig.eisXiConfig).thenReturn(dummyXiConfig)
+
+      val httpClientV2 = mock[HttpClientV2]
+      val retries      = mock[Retries]
+      val metrics      = mock[Metrics]
+      val clock        = Clock.systemUTC()
+
+      val provider = new EISConnectorProviderImpl(appConfig, httpClientV2, retries, metrics, clock)
+
+      val gbConnector1 = provider(CountryCode.Gb)
+      val gbConnector2 = provider(CountryCode.Gb)
+      gbConnector1 must be theSameInstanceAs gbConnector2
+      val xiConnector1 = provider(CountryCode.Xi)
+      val xiConnector2 = provider(CountryCode.Xi)
+      xiConnector1 must be theSameInstanceAs xiConnector2
+      gbConnector1 must not be theSameInstanceAs(xiConnector1)
+
     }
-
-    "retrieves the XI connector for country code Xi" in {
-      Harness(CountryCode.Xi) mustBe Harness.xi
-    }
   }
-
 }

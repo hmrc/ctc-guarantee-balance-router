@@ -17,7 +17,9 @@
 package uk.gov.hmrc.ctcguaranteebalancerouter.controllers
 
 import cats.syntax.all._
-import org.mockito.MockitoSugar
+import org.mockito.ArgumentMatchers.eq as eqTo
+import org.mockito.Mockito.when
+import org.scalatestplus.mockito.MockitoSugar
 import org.scalacheck.Gen
 import org.scalatest.OptionValues
 import org.scalatest.concurrent.ScalaFutures

@@ -25,7 +25,6 @@ import uk.gov.hmrc.http.client.StreamHttpReads
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
-import scala.reflect.runtime.universe
 
 class FakeRequestBuilder extends RequestBuilder {
   override def transform(transform: WSRequest => WSRequest): RequestBuilder = this

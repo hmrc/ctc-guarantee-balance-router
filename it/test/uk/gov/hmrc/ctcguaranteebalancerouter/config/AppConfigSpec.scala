@@ -30,6 +30,8 @@ class AppConfigSpec extends AnyFreeSpec {
     config.eisGbConfig
     config.eisXiConfig
     config.internalAuthEnabled
+    config.appName
+    config.headerCarrierConfig
 
     // we're just checking it can be loaded here.
     succeed

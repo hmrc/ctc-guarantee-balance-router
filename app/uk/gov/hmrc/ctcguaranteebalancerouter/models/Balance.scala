@@ -16,9 +16,10 @@
 
 package uk.gov.hmrc.ctcguaranteebalancerouter.models
 
+import play.api.libs.json.Format
 import play.api.libs.json.Json
 
 object Balance {
-  implicit val balanceFormat = Json.valueFormat[Balance]
+  implicit val balanceFormat: Format[Balance] = Json.valueFormat[Balance]
 }
 case class Balance(value: Double) extends AnyVal

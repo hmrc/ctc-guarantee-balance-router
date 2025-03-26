@@ -18,7 +18,9 @@ package uk.gov.hmrc.ctcguaranteebalancerouter.services
 
 import cats.data.EitherT
 import org.mockito.ArgumentMatchers.any
-import org.mockito.MockitoSugar
+import org.mockito.ArgumentMatchers.eq as eqTo
+import org.mockito.Mockito.when
+import org.scalatestplus.mockito.MockitoSugar
 import org.scalacheck.Arbitrary.arbitrary
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.freespec.AnyFreeSpec
@@ -36,6 +38,7 @@ import uk.gov.hmrc.ctcguaranteebalancerouter.utils.Generators
 import uk.gov.hmrc.http.HeaderCarrier
 
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
 
 class BalanceRetrievalServiceSpec extends AnyFreeSpec with Matchers with ScalaCheckDrivenPropertyChecks with MockitoSugar with ScalaFutures with Generators {
 
@@ -54,7 +57,7 @@ class BalanceRetrievalServiceSpec extends AnyFreeSpec with Matchers with ScalaCh
       (grn, balanceResponse, countryCode, accessCode) =>
         val mockConnector = mock[EISConnector]
         when(mockConnector.getBalanceRequest(GuaranteeReferenceNumber(any()), any())(any()))
-          .thenReturn(EitherT.rightT(balanceResponse))
+          .thenReturn(EitherT.rightT[Future, ConnectorError](balanceResponse))
 
         val sut = new BalanceRetrievalServiceImpl(FakeEISConnectorProvider(mockConnector, mockConnector))
 
@@ -71,7 +74,7 @@ class BalanceRetrievalServiceSpec extends AnyFreeSpec with Matchers with ScalaCh
       (grn, countryCode, accessCode) =>
         val mockConnector = mock[EISConnector]
         when(mockConnector.getBalanceRequest(GuaranteeReferenceNumber(any()), any())(any()))
-          .thenReturn(EitherT.leftT(ConnectorError.FailedToDeserialise))
+          .thenReturn(EitherT.leftT[Future, BalanceResponse](ConnectorError.FailedToDeserialise))
 
         val sut = new BalanceRetrievalServiceImpl(FakeEISConnectorProvider(mockConnector, mockConnector))
 
@@ -89,7 +92,7 @@ class BalanceRetrievalServiceSpec extends AnyFreeSpec with Matchers with ScalaCh
         val error         = new IllegalStateException()
         val mockConnector = mock[EISConnector]
         when(mockConnector.getBalanceRequest(GuaranteeReferenceNumber(any()), any())(any()))
-          .thenReturn(EitherT.leftT(ConnectorError.Unexpected("nope", Some(error))))
+          .thenReturn(EitherT.leftT[Future, BalanceResponse](ConnectorError.Unexpected("nope", Some(error))))
 
         val sut = new BalanceRetrievalServiceImpl(FakeEISConnectorProvider(mockConnector, mockConnector))
 
@@ -105,7 +108,8 @@ class BalanceRetrievalServiceSpec extends AnyFreeSpec with Matchers with ScalaCh
     ) {
       (grn, countryCode, accessCode) =>
         val mockConnector = mock[EISConnector]
-        when(mockConnector.getBalanceRequest(GuaranteeReferenceNumber(any()), any())(any())).thenReturn(EitherT.leftT(ConnectorError.GrnNotFound))
+        when(mockConnector.getBalanceRequest(GuaranteeReferenceNumber(any()), any())(any()))
+          .thenReturn(EitherT.leftT[Future, BalanceResponse](ConnectorError.GrnNotFound))
 
         val sut = new BalanceRetrievalServiceImpl(FakeEISConnectorProvider(mockConnector, mockConnector))
 

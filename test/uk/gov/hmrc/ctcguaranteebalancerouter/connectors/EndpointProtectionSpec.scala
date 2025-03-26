@@ -17,18 +17,22 @@
 package uk.gov.hmrc.ctcguaranteebalancerouter.connectors
 
 import org.apache.pekko.stream.Materializer
-import org.mockito.MockitoSugar
+import org.mockito.Mockito.verify
+import org.scalatestplus.mockito.MockitoSugar
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.time.SpanSugar.convertIntToGrainOfTime
+import org.scalatestplus.mockito.MockitoSugar
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
+import play.api.LoggerLike
 import play.api.Logging
 import uk.gov.hmrc.ctcguaranteebalancerouter.config.CircuitBreakerConfig
 import uk.gov.hmrc.ctcguaranteebalancerouter.config.RetryConfig
 import uk.gov.hmrc.ctcguaranteebalancerouter.utils.Generators
 import uk.gov.hmrc.ctcguaranteebalancerouter.utils.TestActorSystem
 
+import scala.concurrent.Future
 import scala.util.Failure
 import scala.util.Try
 
