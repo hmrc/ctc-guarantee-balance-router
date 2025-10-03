@@ -18,8 +18,7 @@ lazy val microservice = Project("ctc-guarantee-balance-router", file("."))
     )
   )
   .settings(inThisBuild(buildSettings))
-  .settings(resolvers += Resolver.jcenterRepo)
-  .settings(CodeCoverageSettings.settings: _*)
+  .settings(CodeCoverageSettings.settings *)
 
 lazy val it = project
   .enablePlugins(PlayScala)
