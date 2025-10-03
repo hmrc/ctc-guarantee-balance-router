@@ -98,8 +98,7 @@ class EndpointProtectionSpec
 
   "EndpointProtection#wrapRetryCondition" - {
 
-    "must return a successful Future with false when retryWhen returns true (sending Future(false) to wasSuccessful)" in {
-
+    "must return a successful Future with false when retryWhen returns true (sending Future(false) to wasSuccessful)" in
       whenReady(
         Harness.wrapRetryCondition[Boolean](
           r => r
@@ -108,10 +107,7 @@ class EndpointProtectionSpec
         r => r mustBe false
       }
 
-    }
-
-    "must return a successful Future with true when retryWhen returns false (sending Future(true) to wasSuccessful)" in {
-
+    "must return a successful Future with true when retryWhen returns false (sending Future(true) to wasSuccessful)" in
       whenReady(
         Harness.wrapRetryCondition[Boolean](
           r => r
@@ -119,8 +115,6 @@ class EndpointProtectionSpec
       ) {
         r => r mustBe true
       }
-
-    }
 
   }
 

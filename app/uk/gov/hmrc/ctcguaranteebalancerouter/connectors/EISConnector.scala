@@ -128,8 +128,8 @@ class EISConnectorImpl(
   )(implicit ec: ExecutionContext, reads: Reads[A]): EitherT[Future, ConnectorError, A] =
     EitherT {
       protect(isFailure[A], isFailure[A], retryLogging) {
-        val correlationId = UUID.randomUUID().toString
-        val requestId     = hc.requestId.getOrElse("unknown")
+        val correlationId  = UUID.randomUUID().toString
+        val requestId      = hc.requestId.getOrElse("unknown")
         val requestHeaders = hc.headers(Seq(HMRCHeaderNames.xRequestId)) ++ Seq(
           "Date"                    -> s"${HTTP_DATE_FORMATTER.format(OffsetDateTime.now(clock))} UTC",
           "X-Correlation-Id"        -> correlationId,
@@ -165,7 +165,7 @@ class EISConnectorImpl(
                   case success if success >= 200 & success < 300 =>
                     response.json.validate[A] match {
                       case JsSuccess(value, _) => Right(value)
-                      case JsError(_) =>
+                      case JsError(_)          =>
                         logger.error(
                           s"Request Error: Routing to $code succeeded, but returned payload was malformed. Request ID: $requestId. Correlation ID: $correlationId."
                         )
