@@ -270,7 +270,7 @@ class BalanceControllerSpec extends AnyFreeSpec with Matchers with MockitoSugar 
         when(ces.extractCountry(GuaranteeReferenceNumber(eqTo(grn.value))))
           .thenReturn(EitherT.rightT[Future, AccessCodeError](CountryCode.Gb))
 
-        val sut = new BalanceController(acs, brs, ces, stubControllerComponents(), internalAuthActionProvider)
+        val sut    = new BalanceController(acs, brs, ces, stubControllerComponents(), internalAuthActionProvider)
         val result =
           sut.postBalance(grn)(FakeRequest("POST", "/", FakeHeaders(Seq(HeaderNames.AUTHORIZATION -> "Token 1234")), requests.RouterBalanceRequest(accessCode)))
 
