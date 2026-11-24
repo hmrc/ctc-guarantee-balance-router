@@ -22,6 +22,6 @@ object AppDependencies {
     "org.scalatestplus" %% "scalacheck-1-17"         % "3.2.17.0",
     "uk.gov.hmrc"       %% "bootstrap-test-play-30"  % bootstrapVersion,
     "org.scalatestplus" %% "mockito-4-11" % "3.2.17.0",
-    "org.mockito"        % "mockito-core"            % "5.9.0"
+    "org.mockito"        % "mockito-core"            % "5.24.0"
   ).map(_ % Test)
 }
